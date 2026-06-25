@@ -1,0 +1,43 @@
+# Shiva Toolkit v1.0.0 Stable global configuration.
+#
+# Host-specific checks are selected by:
+#   /etc/shiva/profiles/<hostname>.conf
+# and fall back to a built-in profile when available.
+# Values in this file are optional final overrides.
+#
+# CHECK_TEMPERATURE=true
+# CHECK_SMART=true
+# CHECK_INTERFACES=true
+# CHECK_DOCKER=true
+# CHECK_OPENVPN=true
+# CHECK_OCSERV=false
+# CHECK_AMNEZIA=false
+#
+# Optional space-separated interfaces that must be UP. When empty, Shiva
+# checks that at least one non-loopback interface is UP.
+# REQUIRED_INTERFACES="eth0"
+#
+# Singular alias, supported for one required interface:
+# REQUIRED_INTERFACE="tun0"
+
+# Optional explicit physical disk for SMART. When empty, Shiva detects the
+# physical disk underneath the root filesystem.
+# SMART_DISK="/dev/sda"
+
+# Local VPN client interfaces and optional Amnezia systemd service.
+OPENVPN_INTERFACE="tun0"
+AMNEZIA_INTERFACE="awg0"
+AMNEZIA_SERVICE="awg-quick@awg0"
+
+# Host used to verify DNS resolution.
+SHIVA_DNS_TEST_HOST="example.com"
+
+# TCP connection timeout in seconds.
+SHIVA_CONNECT_TIMEOUT=3
+
+# Backup freshness check.
+SHIVA_BACKUP_DIR="/var/backups"
+SHIVA_BACKUP_MAX_AGE_HOURS=48
+
+# Number of warning/error journal lines shown by shiva-logs.
+SHIVA_LOG_LINES=50

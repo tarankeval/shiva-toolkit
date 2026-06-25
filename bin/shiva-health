@@ -1,0 +1,161 @@
+#!/usr/bin/env bash
+set -u
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../lib/shiva/bootstrap.sh" 2>/dev/null || source /usr/local/lib/shiva/bootstrap.sh
+shiva_load_common
+
+failures=0
+warnings=0
+passed=0
+report() {
+  shiva_status "$@"
+  case "$1" in
+    ok) ((passed+=1)) ;;
+    fail) ((failures+=1)) ;;
+    warn) ((warnings+=1)) ;;
+  esac
+}
+
+shiva_title "SHIVA HEALTH v$SHIVA_VERSION"
+
+if shiva_check_enabled CHECK_TEMPERATURE; then
+  temp="UNKNOWN"
+  if [[ -r /sys/class/thermal/thermal_zone0/temp ]]; then
+    raw_temp="$(< /sys/class/thermal/thermal_zone0/temp)"
+    if (( raw_temp > 0 )); then
+      temp="$((raw_temp / 1000))°C"
+      (( raw_temp >= 80000 )) && temp_level=fail || { (( raw_temp >= 70000 )) && temp_level=warn || temp_level=ok; }
+    else
+      temp_level=warn
+    fi
+  else
+    temp_level=warn
+  fi
+  report "$temp_level" "CPU" "$temp"
+fi
+
+if shiva_have free; then
+  read -r ram_total ram_used < <(free -m | awk '/^Mem:/ {print $2, $3}')
+  ram_percent=$((ram_used * 100 / ram_total))
+  (( ram_percent >= 90 )) && ram_level=fail || { (( ram_percent >= 80 )) && ram_level=warn || ram_level=ok; }
+  report "$ram_level" "RAM" "${ram_used} MB / ${ram_total} MB"
+else
+  report warn "RAM" "UNAVAILABLE"
+fi
+
+if shiva_check_enabled CHECK_SMART; then
+  smart_disk="$SMART_DISK"
+  [[ -n "$smart_disk" ]] || smart_disk="$(shiva_root_disk || true)"
+  if [[ -n "$smart_disk" ]]; then
+    disk_model="$(shiva_disk_model "$smart_disk")"
+    disk_label="$smart_disk"
+    [[ -n "$disk_model" ]] && disk_label+=" $disk_model"
+    shiva_smart_health "$smart_disk"
+    case "$SHIVA_SMART_STATE" in
+      passed) report ok "SSD" "PASSED ($disk_label)" ;;
+      failed) report fail "SSD" "SMART FAILED ($disk_label)" ;;
+      not_installed) report warn "SSD" "SMART NOT INSTALLED" ;;
+      requires_sudo) report warn "SSD" "SMART REQUIRES SUDO" ;;
+      *) report warn "SSD" "SMART UNKNOWN ($disk_label)" ;;
+    esac
+  else
+    report warn "SSD" "SMART UNKNOWN (DISK NOT FOUND)"
+  fi
+fi
+
+read -r root_percent < <(df -P / | awk 'NR==2 {gsub("%","",$5); print $5}')
+(( root_percent >= 95 )) && fs_level=fail || { (( root_percent >= 85 )) && fs_level=warn || fs_level=ok; }
+report "$fs_level" "Root FS" "${root_percent}%"
+
+if shiva_check_enabled CHECK_INTERFACES; then
+  if [[ -n "$REQUIRED_INTERFACES" ]]; then
+    for interface in $REQUIRED_INTERFACES; do
+      if shiva_required_interface_healthy "$interface"; then
+        report ok "Interface $interface" "UP"
+      else
+        report fail "Interface $interface" "DOWN OR MISSING"
+      fi
+    done
+  elif shiva_have ip; then
+    active_interfaces="$(shiva_active_interfaces)"
+    if [[ -n "$active_interfaces" ]]; then
+      report ok "Interfaces" "$active_interfaces"
+    else
+      report fail "Interfaces" "NO ACTIVE INTERFACES"
+    fi
+  else
+    report warn "Interfaces" "IP COMMAND UNAVAILABLE"
+  fi
+fi
+
+if shiva_check_enabled CHECK_OPENVPN; then
+  state="$(shiva_openvpn_state)"
+  report "$(shiva_service_level "$state")" "OPENVPN CLIENT" "$state"
+fi
+
+if shiva_check_enabled CHECK_OCSERV; then
+  state="$(shiva_service_state ocserv)"
+  report "$(shiva_service_level "$state")" "OCSERV" "$state"
+fi
+
+if shiva_check_enabled CHECK_AMNEZIA; then
+  state="$(shiva_amnezia_state)"
+  report "$(shiva_service_level "$state")" "AMNEZIA" "$state"
+fi
+
+if shiva_check_enabled CHECK_DOCKER; then
+  state="$(shiva_service_state docker)"
+  report "$(shiva_service_level "$state")" "DOCKER" "$state"
+fi
+
+if ip route show default 2>/dev/null | grep -q '^default'; then
+  report ok "Gateway" "OK"
+else
+  report fail "Gateway" "FAILED"
+fi
+
+if timeout "${SHIVA_CONNECT_TIMEOUT:-3}" bash -c '</dev/tcp/1.1.1.1/443' 2>/dev/null; then
+  report ok "Internet" "OK"
+else
+  report fail "Internet" "FAILED"
+fi
+
+if getent hosts "${SHIVA_DNS_TEST_HOST:-example.com}" >/dev/null 2>&1; then
+  report ok "DNS" "OK"
+else
+  report fail "DNS" "FAILED"
+fi
+
+if shiva_have systemctl; then
+  failed_units="$(systemctl --failed --no-legend 2>/dev/null | grep -c . || true)"
+  if (( failed_units == 0 )); then
+    report ok "Failed Units" "NONE"
+  else
+    report fail "Failed Units" "$failed_units"
+  fi
+else
+  report warn "Failed Units" "UNAVAILABLE"
+fi
+
+total=$((passed + warnings + failures))
+if (( total > 0 )); then
+  health_percent=$(((passed * 100 + warnings * 50) / total))
+else
+  health_percent=0
+fi
+
+printf '\n══════════════════════════════════════\n\n%sHealth Summary%s\n\n' "$SHIVA_BOLD" "$SHIVA_RESET"
+shiva_status ok "Passed" "$passed"
+shiva_status warn "Warning" "$warnings"
+shiva_status fail "Errors" "$failures"
+printf '\n%sServer Health%s\n\n%d%%\n' "$SHIVA_BOLD" "$SHIVA_RESET" "$health_percent"
+printf '\n══════════════════════════════════════\n\n%sOverall Status%s\n\n' "$SHIVA_BOLD" "$SHIVA_RESET"
+if (( failures > 0 )); then
+  shiva_status fail "" "ATTENTION REQUIRED"
+  exit 2
+elif (( warnings > 0 )); then
+  shiva_status warn "" "GOOD, WITH WARNINGS"
+  exit 1
+else
+  shiva_status ok "" "EXCELLENT"
+fi

@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+set -u
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../lib/shiva/bootstrap.sh" 2>/dev/null || source /usr/local/lib/shiva/bootstrap.sh
+shiva_load_common
+
+shiva_title "SHIVA UPDATE"
+apply=false
+[[ "${1:-}" == "--apply" ]] && apply=true
+
+if shiva_have apt-get; then
+  if "$apply"; then
+    shiva_require_root || exit 1
+    apt-get update && apt-get upgrade
+  else
+    apt list --upgradable 2>/dev/null
+    printf '\nRun sudo shiva-update --apply to install updates.\n'
+  fi
+elif shiva_have dnf; then
+  if "$apply"; then
+    shiva_require_root || exit 1
+    dnf upgrade
+  else
+    dnf check-update
+  fi
+elif shiva_have pacman; then
+  if "$apply"; then
+    shiva_require_root || exit 1
+    pacman -Syu
+  else
+    pacman -Qu
+  fi
+else
+  printf 'Supported package manager not found.\n' >&2
+  exit 1
+fi

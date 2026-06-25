@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -u
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../lib/shiva/bootstrap.sh" 2>/dev/null || source /usr/local/lib/shiva/bootstrap.sh
+shiva_load_common
+
+shiva_title "SHIVA NETWORK"
+if shiva_check_enabled CHECK_INTERFACES; then
+  printf '%sInterfaces%s\n' "$SHIVA_BOLD" "$SHIVA_RESET"
+  ip -brief address 2>/dev/null || printf 'ip command unavailable\n'
+fi
+printf '\n%sRoutes%s\n' "$SHIVA_BOLD" "$SHIVA_RESET"
+ip route 2>/dev/null || true
+printf '\n%sListening ports%s\n' "$SHIVA_BOLD" "$SHIVA_RESET"
+if shiva_have ss; then
+  ss -lntup 2>/dev/null
+else
+  printf 'ss command unavailable\n'
+fi

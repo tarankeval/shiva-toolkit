@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+set -u
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../lib/shiva/bootstrap.sh" 2>/dev/null || source /usr/local/lib/shiva/bootstrap.sh
+shiva_load_common
+
+shiva_title "SHIVA BACKUPS"
+backup_dir="${SHIVA_BACKUP_DIR:-/var/backups}"
+max_age_hours="${SHIVA_BACKUP_MAX_AGE_HOURS:-48}"
+
+if [[ ! -d "$backup_dir" ]]; then
+  shiva_status fail "Backup directory" "NOT FOUND: $backup_dir"
+  exit 2
+fi
+
+latest="$(find "$backup_dir" -type f -printf '%T@ %p\n' 2>/dev/null | sort -nr | head -n1 || true)"
+if [[ -z "$latest" ]]; then
+  shiva_status fail "Latest backup" "NONE"
+  exit 2
+fi
+
+timestamp="${latest%% *}"
+path="${latest#* }"
+age_hours=$(( ($(date +%s) - ${timestamp%.*}) / 3600 ))
+if (( age_hours <= max_age_hours )); then
+  level=ok
+else
+  level=fail
+fi
+shiva_status "$level" "Latest backup" "$path"
+shiva_status "$level" "Backup age" "${age_hours}h (limit ${max_age_hours}h)"

@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -u
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../lib/shiva/bootstrap.sh" 2>/dev/null || source /usr/local/lib/shiva/bootstrap.sh
+shiva_load_common
+
+shiva_title "SHIVA LOGS"
+lines="${SHIVA_LOG_LINES:-50}"
+if shiva_have journalctl; then
+  journalctl -p warning..alert -n "$lines" --no-pager
+elif [[ -r /var/log/syslog ]]; then
+  tail -n "$lines" /var/log/syslog
+else
+  printf 'No supported system log source is accessible.\n'
+  exit 1
+fi

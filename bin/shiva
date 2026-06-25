@@ -1,0 +1,83 @@
+#!/usr/bin/env bash
+set -u
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../lib/shiva/bootstrap.sh" 2>/dev/null || source /usr/local/lib/shiva/bootstrap.sh
+shiva_load_common
+
+run_command() {
+  local command="$1"
+  shift || true
+  if command -v "shiva-$command" >/dev/null 2>&1; then
+    "shiva-$command" "$@"
+  elif [[ -x "$SCRIPT_DIR/shiva-$command" ]]; then
+    "$SCRIPT_DIR/shiva-$command" "$@"
+  else
+    printf 'Unknown or unavailable command: %s\n' "$command" >&2
+    return 1
+  fi
+}
+
+show_help() {
+  local help_text
+  help_text="$(shiva_version_string) ($SHIVA_RELEASE)
+
+Usage: shiva [command]
+
+Commands:
+  health   Full server health check
+  network  Network diagnostics"
+  shiva_vpn_checks_enabled &&
+    help_text+=$'\n  vpn      VPN service status'
+  shiva_check_enabled CHECK_DOCKER &&
+    help_text+=$'\n  docker   Docker status'
+  help_text+=$'\n  update   Check or apply system updates'
+  help_text+=$'\n  doctor   Diagnose common problems'
+  help_text+=$'\n  logs     Show important system logs'
+  help_text+=$'\n  backup   Inspect configured backups'
+  printf '%s\n' "$help_text"
+}
+
+show_menu() {
+  local choice index selected
+  local -a menu_labels menu_commands
+  while true; do
+    menu_labels=("Health Check" "Network")
+    menu_commands=("health" "network")
+    if shiva_vpn_checks_enabled; then
+      menu_labels+=("VPN Status")
+      menu_commands+=("vpn")
+    fi
+    if shiva_check_enabled CHECK_DOCKER; then
+      menu_labels+=("Docker")
+      menu_commands+=("docker")
+    fi
+    menu_labels+=("System Update" "Repair / Doctor" "Logs" "Backups")
+    menu_commands+=("update" "doctor" "logs" "backup")
+
+    clear 2>/dev/null || true
+    shiva_title "SHIVA TOOLKIT v$SHIVA_VERSION"
+    for index in "${!menu_labels[@]}"; do
+      printf '%d. %s\n\n' "$((index + 1))" "${menu_labels[$index]}"
+    done
+    printf '0. Exit\n\n'
+    printf 'Select: '
+    read -r choice || return 0
+    if [[ "$choice" == "0" ]]; then
+      return 0
+    elif [[ "$choice" =~ ^[0-9]+$ ]] &&
+      (( choice >= 1 && choice <= ${#menu_commands[@]} )); then
+      selected="${menu_commands[$((choice - 1))]}"
+      run_command "$selected"
+    else
+      printf 'Invalid selection.\n'
+    fi
+    shiva_pause
+  done
+}
+
+case "${1:-}" in
+  "") show_menu ;;
+  -h|--help|help) show_help ;;
+  -V|--version) printf '%s\n' "$(shiva_version_string)" ;;
+  *) command_name="$1"; shift; run_command "$command_name" "$@" ;;
+esac

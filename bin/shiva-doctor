@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+set -u
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../lib/shiva/bootstrap.sh" 2>/dev/null || source /usr/local/lib/shiva/bootstrap.sh
+shiva_load_common
+
+shiva_title "SHIVA DOCTOR"
+shiva_status ok "Release" "$(shiva_version_string) $SHIVA_RELEASE"
+shiva_status ok "Hostname" "$SHIVA_HOSTNAME"
+shiva_status ok "Profile" "$SHIVA_PROFILE_NAME"
+issues=0
+for command in ip df free getent systemctl; do
+  if shiva_have "$command"; then
+    shiva_status ok "$command" "AVAILABLE"
+  else
+    shiva_status fail "$command" "MISSING"
+    ((issues+=1))
+  fi
+done
+
+if (( EUID == 0 )); then
+  shiva_status ok "Privileges" "ROOT"
+else
+  shiva_status warn "Privileges" "LIMITED (use sudo for full diagnostics)"
+fi
+
+if shiva_check_enabled CHECK_SMART; then
+  smart_disk="$SMART_DISK"
+  [[ -n "$smart_disk" ]] || smart_disk="$(shiva_root_disk || true)"
+  if [[ -n "$smart_disk" ]]; then
+    shiva_smart_health "$smart_disk"
+    if [[ "$SHIVA_SMART_STATE" == "unknown" ]]; then
+      shiva_status warn "SMART detail" "${SHIVA_SMART_ERROR//$'\n'/ | }"
+    fi
+  fi
+fi
+
+printf '\n'
+if (( issues == 0 )); then
+  shiva_status ok "Toolkit" "READY"
+else
+  shiva_status fail "Toolkit" "$issues REQUIRED COMMAND(S) MISSING"
+  exit 2
+fi

@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -u
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../lib/shiva/bootstrap.sh" 2>/dev/null || source /usr/local/lib/shiva/bootstrap.sh
+shiva_load_common
+
+if ! shiva_check_enabled CHECK_DOCKER; then
+  exit 0
+fi
+
+shiva_title "SHIVA DOCKER"
+if ! shiva_have docker; then
+  shiva_status warn "Docker" "NOT INSTALLED"
+  exit 1
+fi
+state="$(shiva_service_state docker)"
+shiva_status "$(shiva_service_level "$state")" "Docker" "$state"
+printf '\n'
+docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}' 2>/dev/null || {
+  printf 'Cannot access the Docker daemon.\n' >&2
+  exit 2
+}

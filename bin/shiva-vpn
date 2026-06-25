@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+set -u
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../lib/shiva/bootstrap.sh" 2>/dev/null || source /usr/local/lib/shiva/bootstrap.sh
+shiva_load_common
+
+if ! shiva_vpn_checks_enabled; then
+  exit 0
+fi
+
+shiva_title "SHIVA VPN"
+
+if shiva_check_enabled CHECK_OPENVPN; then
+  state="$(shiva_openvpn_state)"
+  shiva_status "$(shiva_service_level "$state")" "OPENVPN CLIENT" "$state"
+fi
+
+if shiva_check_enabled CHECK_OCSERV; then
+  state="$(shiva_service_state ocserv)"
+  shiva_status "$(shiva_service_level "$state")" "OCSERV" "$state"
+fi
+
+if shiva_check_enabled CHECK_AMNEZIA; then
+  state="$(shiva_amnezia_state)"
+  shiva_status "$(shiva_service_level "$state")" "AMNEZIA" "$state"
+fi
