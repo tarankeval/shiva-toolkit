@@ -1,0 +1,14 @@
+Package: shiva-toolkit
+Version: 1.0.0-1
+Section: admin
+Priority: optional
+Architecture: all
+Maintainer: Taran Keval Singh <231631186+tarankeval@users.noreply.github.com>
+Depends: bash, coreutils, iproute2, procps, util-linux
+Recommends: sudo, smartmontools
+Homepage: https://github.com/tarankeval/shiva-toolkit
+Description: Extensible Linux server health and maintenance toolkit
+ Shiva Toolkit provides a small command-line toolkit for Debian and Ubuntu
+ servers. It includes profile-driven health checks, SMART diagnostics,
+ network and VPN checks, Docker visibility, logs, backups, updates, and a
+ doctor command for troubleshooting.

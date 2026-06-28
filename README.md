@@ -48,6 +48,43 @@ cd shiva-toolkit
 sudo ./install.sh
 ```
 
+## Debian/Ubuntu package
+
+Build a local DEB package:
+
+```bash
+cd shiva-toolkit
+make deb
+```
+
+The package will be written to:
+
+```text
+dist/shiva-toolkit_1.0.0-1_all.deb
+```
+
+Install it on Debian or Ubuntu:
+
+```bash
+sudo apt install ./dist/shiva-toolkit_1.0.0-1_all.deb
+```
+
+The DEB package installs:
+
+```text
+/usr/bin/shiva*
+/usr/lib/shiva
+/etc/shiva/shiva.conf
+/etc/shiva/profiles
+```
+
+`/etc/shiva/shiva.conf` is a Debian conffile, so local edits are preserved
+during package upgrades. Remove the package with:
+
+```bash
+sudo apt remove shiva-toolkit
+```
+
 ## Server profiles
 
 Shiva detects the static hostname with `hostnamectl --static` and loads:

@@ -3,7 +3,8 @@ set -euo pipefail
 PROJECT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 
 for script in "$PROJECT_DIR"/bin/shiva* "$PROJECT_DIR"/lib/shiva/*.sh \
-  "$PROJECT_DIR"/install.sh "$PROJECT_DIR"/tests/*.sh; do
+  "$PROJECT_DIR"/install.sh "$PROJECT_DIR"/packaging/*.sh \
+  "$PROJECT_DIR"/tests/*.sh; do
   bash -n "$script"
 done
 

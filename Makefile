@@ -1,7 +1,7 @@
 PREFIX ?= /usr/local
 DESTDIR ?=
 
-.PHONY: all install test check
+.PHONY: all install test check deb clean
 
 all: test
 
@@ -12,3 +12,9 @@ test:
 	bash tests/smoke.sh
 
 check: test
+
+deb: test
+	bash packaging/build-deb.sh
+
+clean:
+	rm -rf build dist
