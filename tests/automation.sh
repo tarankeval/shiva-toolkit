@@ -149,6 +149,16 @@ doctor_state_output="$(
 grep -q 'SHIVA DOCTOR STATE' <<<"$doctor_state_output"
 grep -q 'WRITABLE' <<<"$doctor_state_output"
 
+doctor_state_json="$(
+  NO_COLOR=1 SHIVA_STATE_DIR="$stage/state-json" \
+    SHIVA_HISTORY_FILE="$stage/state-json/history.log" \
+    SHIVA_WATCHDOG_STATE_FILE="$stage/state-json/watchdog.state" \
+    SHIVA_NOTIFY_STATE_DIR="$stage/state-json/notify" \
+    "$PROJECT_DIR/bin/shiva-doctor" state --json
+)"
+grep -q '"issues":0' <<<"$doctor_state_json"
+grep -q '"files":\[' <<<"$doctor_state_json"
+
 service_plan="$(
   NO_COLOR=1 "$PROJECT_DIR/bin/shiva-service" enable
 )"

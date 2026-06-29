@@ -5,8 +5,16 @@ source "$SCRIPT_DIR/../lib/shiva/bootstrap.sh" 2>/dev/null || source /usr/local/
 shiva_load_common
 
 show_state_diagnostics() {
-  local issues=0 path dir tmp_file seen_paths=""
-  shiva_title "SHIVA DOCTOR STATE"
+  local issues=0 path dir tmp_file seen_paths="" json=false first=true
+  if [[ "${1:-}" == "--json" ]]; then
+    json=true
+  fi
+
+  if [[ "$json" == true ]]; then
+    printf '{"paths":['
+  else
+    shiva_title "SHIVA DOCTOR STATE"
+  fi
 
   for path in "$SHIVA_STATE_DIR" "$(dirname -- "$SHIVA_HISTORY_FILE")" \
     "$(dirname -- "$SHIVA_WATCHDOG_STATE_FILE")" "$SHIVA_NOTIFY_STATE_DIR"; do
@@ -15,26 +23,58 @@ show_state_diagnostics() {
     esac
     seen_paths+=" $path"
     if [[ -d "$path" ]]; then
-      shiva_status ok "$path" "DIRECTORY"
+      status="directory"
     elif mkdir -p "$path" 2>/dev/null; then
-      shiva_status ok "$path" "CREATED"
+      status="created"
     else
-      shiva_status warn "$path" "MISSING"
+      status="missing"
       ((issues+=1))
     fi
+    if [[ "$json" == true ]]; then
+      [[ "$first" == true ]] || printf ','
+      first=false
+      printf '{"path":"%s","status":"%s"}' "$path" "$status"
+    else
+      case "$status" in
+        directory) shiva_status ok "$path" "DIRECTORY" ;;
+        created) shiva_status ok "$path" "CREATED" ;;
+        *) shiva_status warn "$path" "MISSING" ;;
+      esac
+    fi
   done
+
+  if [[ "$json" == true ]]; then
+    printf '],"files":['
+    first=true
+  fi
 
   for path in "$SHIVA_HISTORY_FILE" "$SHIVA_WATCHDOG_STATE_FILE"; do
     dir="$(dirname -- "$path")"
     tmp_file="$dir/.shiva-write-test.$$"
     if mkdir -p "$dir" 2>/dev/null && { printf 'test\n' >"$tmp_file"; } 2>/dev/null; then
       rm -f "$tmp_file"
-      shiva_status ok "$path" "WRITABLE"
+      status="writable"
     else
-      shiva_status warn "$path" "NOT WRITABLE"
+      status="not_writable"
       ((issues+=1))
     fi
+    if [[ "$json" == true ]]; then
+      [[ "$first" == true ]] || printf ','
+      first=false
+      printf '{"path":"%s","status":"%s"}' "$path" "$status"
+    else
+      case "$status" in
+        writable) shiva_status ok "$path" "WRITABLE" ;;
+        *) shiva_status warn "$path" "NOT WRITABLE" ;;
+      esac
+    fi
   done
+
+  if [[ "$json" == true ]]; then
+    printf '],"issues":%s}\n' "$issues"
+    (( issues == 0 ))
+    return
+  fi
 
   if (( issues > 0 )); then
     printf '\nRun sudo ./install.sh or configure SHIVA_HISTORY_FILE and SHIVA_WATCHDOG_STATE_FILE to writable paths.\n'
@@ -44,7 +84,7 @@ show_state_diagnostics() {
 }
 
 case "${1:-}" in
-  state) show_state_diagnostics; exit $? ;;
+  state) shift; show_state_diagnostics "${1:-}"; exit $? ;;
   -h|--help|help)
     cat <<'EOF'
 Usage: shiva doctor [state]
