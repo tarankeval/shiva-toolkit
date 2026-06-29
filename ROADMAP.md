@@ -220,6 +220,13 @@ Acceptance criteria:
 - the command clearly separates local checks from remote checks;
 - offline nodes do not block the whole command.
 
+Initial implementation status:
+
+- `shiva nodes` lists configured local inventory without network scanning;
+- `shiva nodes --json` exposes the inventory for dashboard and future cluster
+  views;
+- `shiva dashboard` includes the configured node count.
+
 ## v2.0: Infrastructure
 
 Main idea:
