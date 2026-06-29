@@ -45,6 +45,7 @@ shiva-notify      Configured notifications
 shiva-service     Manage Shiva systemd services
 shiva-nodes       Configured node inventory
 shiva-cluster     Compact infrastructure overview
+shiva-log         Module logs from Shiva history
 shiva-logs        Recent warning/error logs
 shiva-backup      Backup freshness check
 ```
@@ -87,6 +88,11 @@ shiva nodes
 shiva nodes --json
 shiva cluster
 shiva cluster --json
+shiva log watchdog
+shiva log internet
+shiva log vpn
+shiva log dns
+shiva log all --json
 ```
 
 `shiva repair` runs in dry-run mode by default and prints planned actions.

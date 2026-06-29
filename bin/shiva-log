@@ -1,0 +1,141 @@
+#!/usr/bin/env bash
+set -u
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../lib/shiva/bootstrap.sh" 2>/dev/null || source /usr/local/lib/shiva/bootstrap.sh
+shiva_load_common
+
+target="all"
+limit=50
+level_filter=""
+json=false
+log_tmp="$(mktemp "${TMPDIR:-/tmp}/shiva-log.XXXXXX")" || exit 1
+trap 'rm -f "$log_tmp"' EXIT
+
+usage() {
+  cat <<'EOF'
+Usage: shiva log [all|watchdog|internet|network|dns|vpn|openvpn|repair|notify] [--json] [--level level] [lines]
+
+Show recent Shiva Toolkit module logs from local operational history.
+EOF
+}
+
+json_escape() {
+  local value="$1"
+  value="${value//\\/\\\\}"
+  value="${value//\"/\\\"}"
+  value="${value//$'\n'/\\n}"
+  value="${value//$'\t'/\\t}"
+  printf '%s' "$value"
+}
+
+while (($#)); do
+  case "$1" in
+    -h|--help|help)
+      usage
+      exit 0
+      ;;
+    --json)
+      json=true
+      ;;
+    --level)
+      shift
+      if [[ -z "${1:-}" ]]; then
+        printf 'Missing level after --level.\n' >&2
+        exit 1
+      fi
+      level_filter="$1"
+      ;;
+    --level=*)
+      level_filter="${1#--level=}"
+      ;;
+    all|watchdog|internet|network|dns|vpn|openvpn|repair|notify|advisor|dashboard|backup|health)
+      target="$1"
+      ;;
+    [0-9]*)
+      limit="$1"
+      ;;
+    *)
+      printf 'Unknown log target or option: %s\n' "$1" >&2
+      usage >&2
+      exit 1
+      ;;
+  esac
+  shift
+done
+
+if [[ ! "$limit" =~ ^[0-9]+$ ]]; then
+  printf 'Log line count must be a number.\n' >&2
+  exit 1
+fi
+
+if [[ ! -r "$SHIVA_HISTORY_FILE" ]]; then
+  if [[ "$json" == true ]]; then
+    printf '{"target":"%s","entries":[],"history_file":"%s"}\n' \
+      "$(json_escape "$target")" "$(json_escape "$SHIVA_HISTORY_FILE")"
+  else
+    shiva_title "SHIVA LOG ${target^^}"
+    printf 'No history recorded yet.\n'
+    printf '\nHistory file: %s\n' "$SHIVA_HISTORY_FILE"
+  fi
+  exit 0
+fi
+
+awk -F '\t' -v target="$target" -v level_filter="$level_filter" '
+  function lower(value) {
+    return tolower(value)
+  }
+  function matches_target(module, message, text) {
+    text = lower(module " " message)
+    if (target == "all") return 1
+    if (target == module) return 1
+    if (target == "internet") return text ~ /(internet|connectivity|gateway)/
+    if (target == "network") return text ~ /(network|interface|dhcp|gateway|internet)/
+    if (target == "dns") return text ~ /dns/
+    if (target == "vpn" || target == "openvpn") return text ~ /(vpn|openvpn|tun0)/
+    return 0
+  }
+  (level_filter == "" || $2 == level_filter) && matches_target($3, $4) { print }
+' "$SHIVA_HISTORY_FILE" |
+  tail -n "$limit" >"$log_tmp"
+
+if [[ "$json" == true ]]; then
+  printf '{"target":"%s","entries":[' "$(json_escape "$target")"
+  awk -F '\t' '
+    function esc(value) {
+      gsub(/\\/,"\\\\",value)
+      gsub(/"/,"\\\"",value)
+      gsub(/\t/,"\\t",value)
+      return value
+    }
+    {
+      if (count > 0) printf ","
+      printf "{\"time\":\"%s\",\"level\":\"%s\",\"module\":\"%s\",\"message\":\"%s\"}", esc($1), esc($2), esc($3), esc($4)
+      count += 1
+    }
+  ' "$log_tmp"
+  printf ']}\n'
+  exit 0
+fi
+
+shiva_title "SHIVA LOG ${target^^}"
+
+if [[ ! -s "$log_tmp" ]]; then
+  printf 'No matching log entries.\n'
+  printf '\nHistory file: %s\n' "$SHIVA_HISTORY_FILE"
+  exit 0
+fi
+
+awk -F '\t' '
+  {
+    split($1, parts, "T")
+    day = parts[1]
+    clock = parts[2]
+    sub(/[+-].*/, "", clock)
+    if (day != last_day) {
+      if (last_day != "") print ""
+      print day
+      last_day = day
+    }
+    printf "  %-8s %-5s %-12s %s\n", clock, $2, $3, $4
+  }
+' "$log_tmp"

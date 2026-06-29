@@ -184,6 +184,15 @@ Acceptance criteria:
 - output defaults to recent entries;
 - commands work without requiring a heavy database.
 
+Initial implementation status:
+
+- `shiva log watchdog`, `shiva log internet`, `shiva log dns`, and
+  `shiva log vpn` filter local Shiva history by operational topic;
+- `shiva log all --json` exposes recent module logs for dashboard and future
+  cluster views;
+- the existing `shiva logs` command remains available for system journal
+  warnings and errors.
+
 ## v1.3: Server Farm
 
 Main idea:

@@ -12,6 +12,8 @@ cat >"$history_file" <<'EOF'
 2026-06-24T10:00:00+02:00	ok	watchdog	all checks passed
 2026-06-24T10:05:00+02:00	info	repair	network repair planned for lo
 2026-06-25T11:00:00+02:00	fail	watchdog	2 failure(s) detected
+2026-06-25T11:05:00+02:00	fail	watchdog	DNS failed
+2026-06-25T11:10:00+02:00	fail	watchdog	OpenVPN disconnected
 EOF
 
 history_output="$(
@@ -34,9 +36,31 @@ history_summary="$(
   NO_COLOR=1 SHIVA_HISTORY_FILE="$history_file" \
     "$PROJECT_DIR/bin/shiva-history" --summary 10
 )"
-grep -q 'Total: 3' <<<"$history_summary"
+grep -q 'Total: 5' <<<"$history_summary"
 grep -q 'By level' <<<"$history_summary"
 grep -q 'watchdog' <<<"$history_summary"
+
+log_watchdog_output="$(
+  NO_COLOR=1 SHIVA_HISTORY_FILE="$history_file" \
+    "$PROJECT_DIR/bin/shiva-log" watchdog 10
+)"
+grep -q 'SHIVA LOG WATCHDOG' <<<"$log_watchdog_output"
+grep -q 'OpenVPN disconnected' <<<"$log_watchdog_output"
+! grep -q 'network repair planned' <<<"$log_watchdog_output"
+
+log_dns_json="$(
+  NO_COLOR=1 SHIVA_HISTORY_FILE="$history_file" \
+    "$PROJECT_DIR/bin/shiva-log" dns --json 10
+)"
+grep -q '"target":"dns"' <<<"$log_dns_json"
+grep -q '"DNS failed"' <<<"$log_dns_json"
+! grep -q 'OpenVPN disconnected' <<<"$log_dns_json"
+
+log_vpn_output="$(
+  NO_COLOR=1 SHIVA_HISTORY_FILE="$history_file" \
+    "$PROJECT_DIR/bin/shiva-log" vpn 10
+)"
+grep -q 'OpenVPN disconnected' <<<"$log_vpn_output"
 
 advisor_output="$(
   NO_COLOR=1 SHIVA_HISTORY_FILE="$history_file" \
@@ -52,7 +76,7 @@ advisor_json="$(
     "$PROJECT_DIR/bin/shiva-advisor" --json 10
 )"
 grep -q '"history_window":10' <<<"$advisor_json"
-grep -q '"failures":1' <<<"$advisor_json"
+grep -q '"failures":3' <<<"$advisor_json"
 grep -q '"recommendations":\[' <<<"$advisor_json"
 
 NO_COLOR=1 SHIVA_HISTORY_FILE="$history_file" \
@@ -80,7 +104,7 @@ dashboard_json="$(
     SHIVA_WATCHDOG_STATE_FILE="$state_file" \
     "$PROJECT_DIR/bin/shiva-dashboard" --json 10
 )"
-grep -q '"failures":1' <<<"$dashboard_json"
+grep -q '"failures":3' <<<"$dashboard_json"
 grep -q '"service":' <<<"$dashboard_json"
 grep -q '"nodes":2' <<<"$dashboard_json"
 grep -q '"telegram":"disabled"' <<<"$dashboard_json"
