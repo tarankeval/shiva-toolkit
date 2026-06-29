@@ -12,6 +12,7 @@ usage() {
 Usage: shiva repair [--apply] <target>
 
 Targets:
+  status    Show repair configuration
   network   Inspect and optionally restart the configured network interface
   openvpn   Inspect and optionally restart the configured OpenVPN service
   dns       Inspect and optionally restart the local resolver service
@@ -25,7 +26,7 @@ while (($#)); do
   case "$1" in
     --apply) apply=true ;;
     -h|--help|help) usage; exit 0 ;;
-    network|openvpn|dns) target="$1" ;;
+    status|network|openvpn|dns) target="$1" ;;
     *) printf 'Unknown repair option: %s\n' "$1" >&2; usage >&2; exit 1 ;;
   esac
   shift
@@ -54,6 +55,33 @@ history_result() {
   else
     shiva_history_add repair info "$target_name repair planned for $detail"
   fi
+}
+
+repair_status() {
+  local interface="$SHIVA_REPAIR_INTERFACE" service
+  [[ -n "$interface" ]] || interface="${REQUIRED_INTERFACES%% *}"
+  [[ -n "$interface" ]] || interface="$(shiva_default_route_interface || true)"
+  service="$(detect_openvpn_service || true)"
+
+  shiva_title "SHIVA REPAIR STATUS v$SHIVA_VERSION"
+  shiva_status ok "Default mode" "DRY RUN"
+  if [[ -n "$interface" ]]; then
+    shiva_status ok "Network target" "$interface"
+  else
+    shiva_status warn "Network target" "NOT SELECTED"
+  fi
+  if [[ -n "$service" ]]; then
+    shiva_status ok "OpenVPN target" "$service"
+  else
+    shiva_status warn "OpenVPN target" "NOT SELECTED"
+  fi
+  if shiva_have systemctl &&
+    systemctl list-unit-files systemd-resolved.service --no-legend 2>/dev/null | grep -q .; then
+    shiva_status ok "DNS target" "systemd-resolved"
+  else
+    shiva_status warn "DNS target" "NOT SELECTED"
+  fi
+  shiva_status ok "Apply flag" "required for changes"
 }
 
 repair_network() {
@@ -147,6 +175,7 @@ repair_dns() {
 }
 
 case "$target" in
+  status) repair_status ;;
   network) repair_network ;;
   openvpn) repair_openvpn ;;
   dns) repair_dns ;;

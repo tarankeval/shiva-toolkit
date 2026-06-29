@@ -32,6 +32,13 @@ grep -q 'PLAN bring lo down' <<<"$repair_output"
 grep -q 'PLAN bring lo up' <<<"$repair_output"
 grep -q $'\tinfo\trepair\tnetwork repair planned for lo' "$repair_history"
 
+repair_status="$(
+  NO_COLOR=1 SHIVA_REPAIR_INTERFACE=lo "$PROJECT_DIR/bin/shiva-repair" status
+)"
+grep -q 'Default mode' <<<"$repair_status"
+grep -q 'DRY RUN' <<<"$repair_status"
+grep -q 'Network target' <<<"$repair_status"
+
 printf 'ok\n' >"$state_file"
 NO_COLOR=1 SHIVA_WATCHDOG_STATE_FILE="$state_file" \
   "$PROJECT_DIR/bin/shiva-watchdog" --status >/dev/null

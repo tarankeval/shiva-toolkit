@@ -51,6 +51,7 @@ The same modules can also be called as subcommands, for example
 The `v1.1` development branch introduces the first automation commands:
 
 ```bash
+shiva repair status
 shiva repair network
 shiva repair openvpn
 shiva repair dns
