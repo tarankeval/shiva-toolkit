@@ -62,6 +62,12 @@ shiva history
 Use `--apply` only when the target profile is configured and the command is
 running with the required permissions.
 
+The watchdog is installed with a systemd unit:
+
+```bash
+sudo systemctl enable --now shiva-watchdog
+```
+
 ## Install
 
 ```bash

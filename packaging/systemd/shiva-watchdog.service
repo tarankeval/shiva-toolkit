@@ -1,0 +1,14 @@
+[Unit]
+Description=Shiva Toolkit watchdog
+Documentation=https://github.com/tarankeval/shiva-toolkit
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=@BINDIR@/shiva-watchdog
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

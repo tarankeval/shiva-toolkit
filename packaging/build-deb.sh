@@ -15,6 +15,7 @@ mkdir -p \
   "$PACKAGE_ROOT/usr/bin" \
   "$PACKAGE_ROOT/usr/lib/shiva/profiles" \
   "$PACKAGE_ROOT/usr/share/doc/$PACKAGE_NAME" \
+  "$PACKAGE_ROOT/lib/systemd/system" \
   "$PACKAGE_ROOT/etc/shiva/profiles" \
   "$PROJECT_DIR/dist"
 
@@ -24,6 +25,10 @@ install -m 0644 "$PROJECT_DIR"/lib/shiva/profiles/*.conf \
   "$PACKAGE_ROOT/usr/lib/shiva/profiles/"
 install -m 0644 "$PROJECT_DIR/config/shiva.conf.example" \
   "$PACKAGE_ROOT/etc/shiva/shiva.conf"
+sed 's|@BINDIR@|/usr/bin|g' \
+  "$PROJECT_DIR/packaging/systemd/shiva-watchdog.service" \
+  > "$PACKAGE_ROOT/lib/systemd/system/shiva-watchdog.service"
+chmod 0644 "$PACKAGE_ROOT/lib/systemd/system/shiva-watchdog.service"
 install -m 0644 "$PROJECT_DIR/README.md" \
   "$PACKAGE_ROOT/usr/share/doc/$PACKAGE_NAME/README.md"
 install -m 0644 "$PROJECT_DIR/debian/copyright" \
