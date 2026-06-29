@@ -173,6 +173,19 @@ doctor_config_json="$(
 grep -q '"profile":' <<<"$doctor_config_json"
 grep -q '"nodes":1' <<<"$doctor_config_json"
 
+doctor_release_output="$(
+  NO_COLOR=1 "$PROJECT_DIR/bin/shiva-doctor" release
+)"
+grep -q 'SHIVA DOCTOR RELEASE' <<<"$doctor_release_output"
+grep -q 'Release readiness' <<<"$doctor_release_output"
+
+doctor_release_json="$(
+  NO_COLOR=1 "$PROJECT_DIR/bin/shiva-doctor" release --json
+)"
+grep -q '"issues":0' <<<"$doctor_release_json"
+grep -q '"status":"ok"' <<<"$doctor_release_json"
+grep -q '"README release doctor"' <<<"$doctor_release_json"
+
 service_plan="$(
   NO_COLOR=1 "$PROJECT_DIR/bin/shiva-service" enable
 )"

@@ -167,14 +167,112 @@ show_config_diagnostics() {
   (( issues == 0 ))
 }
 
+show_release_diagnostics() {
+  local json=false issues=0 checks=0 first=true project_dir status detail name
+  local -a json_entries=()
+  project_dir="$(cd -- "$SCRIPT_DIR/.." && pwd)"
+  if [[ "${1:-}" == "--json" ]]; then
+    json=true
+  fi
+
+  record_release_check() {
+    local check_name="$1" check_status="$2" check_detail="$3" entry
+    ((checks+=1))
+    if [[ "$check_status" != "ok" ]]; then
+      ((issues+=1))
+    fi
+    if [[ "$json" == true ]]; then
+      entry='{"name":"'"$(json_escape "$check_name")"'","status":"'"$check_status"'","detail":"'"$(json_escape "$check_detail")"'"}'
+      json_entries+=("$entry")
+    else
+      case "$check_status" in
+        ok) shiva_status ok "$check_name" "$check_detail" ;;
+        warn) shiva_status warn "$check_name" "$check_detail" ;;
+        *) shiva_status fail "$check_name" "$check_detail" ;;
+      esac
+    fi
+  }
+
+  check_release_file() {
+    local check_name="$1" file_path="$2"
+    if [[ -r "$project_dir/$file_path" ]]; then
+      record_release_check "$check_name" ok "$file_path"
+    else
+      record_release_check "$check_name" fail "missing $file_path"
+    fi
+  }
+
+  check_release_exec() {
+    local command_path="$1"
+    if [[ -x "$project_dir/$command_path" ]]; then
+      record_release_check "$command_path" ok "executable"
+    else
+      record_release_check "$command_path" fail "missing or not executable"
+    fi
+  }
+
+  check_release_text() {
+    local check_name="$1" file_path="$2" pattern="$3" ok_detail="$4"
+    if [[ -r "$project_dir/$file_path" ]] && grep -q -- "$pattern" "$project_dir/$file_path"; then
+      record_release_check "$check_name" ok "$ok_detail"
+    else
+      record_release_check "$check_name" fail "not found in $file_path"
+    fi
+  }
+
+  if [[ "$json" != true ]]; then
+    shiva_title "SHIVA DOCTOR RELEASE"
+  fi
+
+  check_release_file "README" "README.md"
+  check_release_file "Roadmap" "ROADMAP.md"
+  check_release_file "Debian control" "debian/control"
+  check_release_file "Build script" "packaging/build-deb.sh"
+  check_release_file "Installer" "install.sh"
+  check_release_file "Systemd unit" "packaging/systemd/shiva-watchdog.service"
+  check_release_file "Smoke tests" "tests/smoke.sh"
+  check_release_file "Automation tests" "tests/automation.sh"
+
+  for name in shiva shiva-watchdog shiva-repair shiva-history shiva-notify \
+    shiva-advisor shiva-dashboard shiva-service shiva-nodes shiva-cluster; do
+    check_release_exec "bin/$name"
+  done
+
+  check_release_text "Package version" "packaging/build-deb.sh" "1.1.0~dev-1" "1.1.0~dev-1"
+  check_release_text "Systemd ExecStart" "packaging/systemd/shiva-watchdog.service" "ExecStart=@BINDIR@/shiva-watchdog" "watchdog service"
+  check_release_text "Notify state dir" "install.sh" "/var/lib/shiva/notify" "created by installer"
+  check_release_text "README release doctor" "README.md" "shiva doctor release" "documented"
+
+  if [[ "$json" == true ]]; then
+    printf '{"checks":%s,"issues":%s,"status":"%s","items":[' "$checks" "$issues" "$([[ "$issues" -eq 0 ]] && printf ok || printf fail)"
+    for detail in "${json_entries[@]}"; do
+      [[ "$first" == true ]] || printf ','
+      first=false
+      printf '%s' "$detail"
+    done
+    printf ']}\n'
+    (( issues == 0 ))
+    return
+  fi
+
+  printf '\n'
+  if (( issues == 0 )); then
+    shiva_status ok "Release readiness" "$checks checks passed"
+  else
+    shiva_status fail "Release readiness" "$issues issue(s)"
+  fi
+  (( issues == 0 ))
+}
+
 case "${1:-}" in
   state) shift; show_state_diagnostics "${1:-}"; exit $? ;;
   config) shift; show_config_diagnostics "${1:-}"; exit $? ;;
+  release) shift; show_release_diagnostics "${1:-}"; exit $? ;;
   -h|--help|help)
     cat <<'EOF'
-Usage: shiva doctor [state|config]
+Usage: shiva doctor [state|config|release]
 
-Diagnose toolkit dependencies, host setup, state paths, and configuration.
+Diagnose toolkit dependencies, host setup, state paths, configuration, and release readiness.
 EOF
     exit 0
     ;;

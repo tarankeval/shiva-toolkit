@@ -65,6 +65,8 @@ shiva repair dns
 shiva repair verify dns
 shiva doctor config
 shiva doctor state
+shiva doctor release
+shiva doctor release --json
 shiva watchdog --once
 shiva watchdog --status
 shiva watchdog --config
