@@ -71,6 +71,7 @@ shiva advisor
 shiva advisor --json
 shiva advisor --notify
 shiva dashboard
+shiva dashboard --json
 shiva notify status
 shiva notify --dry-run "test message"
 ```

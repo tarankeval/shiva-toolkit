@@ -4,19 +4,25 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../lib/shiva/bootstrap.sh" 2>/dev/null || source /usr/local/lib/shiva/bootstrap.sh
 shiva_load_common
 
-limit="${1:-50}"
+limit=50
+json=false
 
 usage() {
   cat <<'EOF'
-Usage: shiva dashboard [history-lines]
+Usage: shiva dashboard [--json] [history-lines]
 
 Show a compact operational dashboard for Shiva Toolkit.
 EOF
 }
 
-case "$limit" in
-  -h|--help|help) usage; exit 0 ;;
-esac
+while (($#)); do
+  case "$1" in
+    --json) json=true ;;
+    -h|--help|help) usage; exit 0 ;;
+    *) limit="$1" ;;
+  esac
+  shift
+done
 
 if [[ ! "$limit" =~ ^[0-9]+$ ]]; then
   printf 'Dashboard history line count must be a number.\n' >&2
@@ -50,7 +56,14 @@ recommendation_count() {
     '
 }
 
-shiva_title "SHIVA DASHBOARD v$SHIVA_VERSION"
+json_escape() {
+  local value="$1"
+  value="${value//\\/\\\\}"
+  value="${value//\"/\\\"}"
+  value="${value//$'\n'/\\n}"
+  value="${value//$'\t'/\\t}"
+  printf '%s' "$value"
+}
 
 state="$(watchdog_state)"
 fail_count="$(history_count fail)"
@@ -58,6 +71,24 @@ warn_count="$(history_count warn)"
 info_count="$(history_count info)"
 advisor_count="$(recommendation_count)"
 [[ -n "$advisor_count" ]] || advisor_count=0
+
+if [[ "$json" == true ]]; then
+  printf '{'
+  printf '"watchdog":"%s",' "$(json_escape "$state")"
+  printf '"failures":%s,' "$fail_count"
+  printf '"warnings":%s,' "$warn_count"
+  printf '"info_events":%s,' "$info_count"
+  printf '"advisor_recommendations":%s,' "$advisor_count"
+  if shiva_enabled "$SHIVA_TELEGRAM_ENABLED"; then
+    printf '"telegram":"enabled"'
+  else
+    printf '"telegram":"disabled"'
+  fi
+  printf '}\n'
+  exit 0
+fi
+
+shiva_title "SHIVA DASHBOARD v$SHIVA_VERSION"
 
 case "$state" in
   ok) shiva_status ok "Watchdog" "OK" ;;
