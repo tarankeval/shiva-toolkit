@@ -40,10 +40,17 @@ grep -q 'DRY RUN' <<<"$repair_status"
 grep -q 'Network target' <<<"$repair_status"
 
 notify_output="$(
-  NO_COLOR=1 "$PROJECT_DIR/bin/shiva-notify" --dry-run "test message"
+  NO_COLOR=1 "$PROJECT_DIR/bin/shiva-notify" --dry-run --category test "test message"
 )"
 grep -q 'DRY RUN' <<<"$notify_output"
+grep -q 'Category' <<<"$notify_output"
 grep -q 'test message' <<<"$notify_output"
+
+notify_status="$(
+  NO_COLOR=1 "$PROJECT_DIR/bin/shiva-notify" status
+)"
+grep -q 'Telegram' <<<"$notify_status"
+grep -q 'Cooldown' <<<"$notify_status"
 
 printf 'ok\n' >"$state_file"
 NO_COLOR=1 SHIVA_WATCHDOG_STATE_FILE="$state_file" \

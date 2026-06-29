@@ -45,6 +45,8 @@ SHIVA_WATCHDOG_INTERVAL=60
 SHIVA_WATCHDOG_AUTO_REPAIR=false
 SHIVA_WATCHDOG_REPAIR_TARGETS="network dns openvpn"
 SHIVA_NOTIFY_ON_WATCHDOG=true
+SHIVA_NOTIFY_COOLDOWN_SECONDS=900
+SHIVA_NOTIFY_STATE_DIR="/var/lib/shiva/notify"
 
 # Telegram notifications. Keep token and chat ID outside git-tracked files.
 SHIVA_TELEGRAM_ENABLED=false

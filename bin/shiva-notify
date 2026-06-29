@@ -5,10 +5,13 @@ source "$SCRIPT_DIR/../lib/shiva/bootstrap.sh" 2>/dev/null || source /usr/local/
 shiva_load_common
 
 dry_run=false
+status_only=false
+category="default"
 
 usage() {
   cat <<'EOF'
-Usage: shiva notify [--dry-run] <message>
+Usage: shiva notify [--dry-run] [--category name] <message>
+       shiva notify status
 
 Send a configured Shiva Toolkit notification. Telegram is disabled by default.
 EOF
@@ -17,10 +20,50 @@ EOF
 while (($#)); do
   case "$1" in
     --dry-run) dry_run=true; shift ;;
+    --category)
+      shift
+      if [[ -z "${1:-}" ]]; then
+        printf 'Missing category after --category.\n' >&2
+        exit 1
+      fi
+      category="$1"
+      shift
+      ;;
+    --category=*)
+      category="${1#--category=}"
+      shift
+      ;;
+    status) status_only=true; shift ;;
     -h|--help|help) usage; exit 0 ;;
     *) break ;;
   esac
 done
+
+notify_status() {
+  shiva_title "SHIVA NOTIFY STATUS v$SHIVA_VERSION"
+  if shiva_enabled "$SHIVA_TELEGRAM_ENABLED"; then
+    shiva_status ok "Telegram" "ENABLED"
+  else
+    shiva_status warn "Telegram" "DISABLED"
+  fi
+  if [[ -n "$SHIVA_TELEGRAM_BOT_TOKEN" ]]; then
+    shiva_status ok "Bot token" "SET"
+  else
+    shiva_status warn "Bot token" "MISSING"
+  fi
+  if [[ -n "$SHIVA_TELEGRAM_CHAT_ID" ]]; then
+    shiva_status ok "Chat ID" "SET"
+  else
+    shiva_status warn "Chat ID" "MISSING"
+  fi
+  shiva_status ok "Cooldown" "${SHIVA_NOTIFY_COOLDOWN_SECONDS}s"
+  shiva_status ok "State dir" "$SHIVA_NOTIFY_STATE_DIR"
+}
+
+if [[ "$status_only" == true ]]; then
+  notify_status
+  exit 0
+fi
 
 message="$*"
 if [[ -z "$message" ]]; then
@@ -31,8 +74,23 @@ fi
 if [[ "$dry_run" == true ]]; then
   shiva_title "SHIVA NOTIFY v$SHIVA_VERSION"
   shiva_status ok "Mode" "DRY RUN"
+  shiva_status ok "Category" "$category"
   printf '%s\n' "$message"
   exit 0
+fi
+
+safe_category="${category//[^A-Za-z0-9_.-]/_}"
+state_file="$SHIVA_NOTIFY_STATE_DIR/$safe_category.last"
+now="$(date +%s)"
+if [[ "$SHIVA_NOTIFY_COOLDOWN_SECONDS" =~ ^[0-9]+$ ]] &&
+  (( SHIVA_NOTIFY_COOLDOWN_SECONDS > 0 )) &&
+  [[ -r "$state_file" ]]; then
+  last_sent="$(<"$state_file")"
+  if [[ "$last_sent" =~ ^[0-9]+$ ]] &&
+    (( now - last_sent < SHIVA_NOTIFY_COOLDOWN_SECONDS )); then
+    shiva_history_add notify info "notification skipped by cooldown: $category"
+    exit 0
+  fi
 fi
 
 if ! shiva_enabled "$SHIVA_TELEGRAM_ENABLED"; then
@@ -57,6 +115,8 @@ if curl -fsS \
   --data-urlencode "text=$message" \
   "https://api.telegram.org/bot${SHIVA_TELEGRAM_BOT_TOKEN}/sendMessage" \
   >/dev/null; then
+  mkdir -p "$SHIVA_NOTIFY_STATE_DIR" 2>/dev/null || true
+  printf '%s\n' "$now" >"$state_file" 2>/dev/null || true
   shiva_history_add notify ok "telegram notification sent"
 else
   shiva_history_add notify fail "telegram notification failed"

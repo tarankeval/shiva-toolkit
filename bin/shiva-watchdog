@@ -96,7 +96,7 @@ run_auto_repairs() {
 notify_watchdog() {
   local level="$1" message="$2"
   shiva_enabled "$SHIVA_NOTIFY_ON_WATCHDOG" || return 0
-  "$SCRIPT_DIR/shiva-notify" "[$level] $SHIVA_HOSTNAME: $message" || true
+  "$SCRIPT_DIR/shiva-notify" --category "watchdog-$level" "[$level] $SHIVA_HOSTNAME: $message" || true
 }
 
 watchdog_cycle() {
