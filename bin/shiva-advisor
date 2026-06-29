@@ -5,34 +5,35 @@ source "$SCRIPT_DIR/../lib/shiva/bootstrap.sh" 2>/dev/null || source /usr/local/
 shiva_load_common
 
 limit=100
+json=false
 
 usage() {
   cat <<'EOF'
-Usage: shiva advisor [lines]
+Usage: shiva advisor [--json] [lines]
 
 Show deterministic recommendations based on Shiva configuration and history.
 EOF
 }
 
-case "${1:-}" in
-  -h|--help|help) usage; exit 0 ;;
-  "") ;;
-  *)
-    limit="$1"
-    ;;
-esac
+while (($#)); do
+  case "$1" in
+    --json) json=true ;;
+    -h|--help|help) usage; exit 0 ;;
+    *) limit="$1" ;;
+  esac
+  shift
+done
 
 if [[ ! "$limit" =~ ^[0-9]+$ ]]; then
   printf 'Advisor history line count must be a number.\n' >&2
   exit 1
 fi
 
-recommendations=0
+recommendations=()
 
 recommend() {
   local message="$1"
-  printf '%s\n' "- $message"
-  ((recommendations+=1))
+  recommendations+=("$message")
 }
 
 history_count() {
@@ -47,17 +48,52 @@ watchdog_state() {
   cat "$SHIVA_WATCHDOG_STATE_FILE"
 }
 
-shiva_title "SHIVA ADVISOR v$SHIVA_VERSION"
+json_escape() {
+  local value="$1"
+  value="${value//\\/\\\\}"
+  value="${value//\"/\\\"}"
+  value="${value//$'\n'/\\n}"
+  value="${value//$'\t'/\\t}"
+  printf '%s' "$value"
+}
+
+print_json() {
+  local index recommendation
+  printf '{'
+  printf '"history_window":%s,' "$limit"
+  printf '"failures":%s,' "$fail_count"
+  printf '"warnings":%s,' "$warn_count"
+  printf '"watchdog_state":"%s",' "$(json_escape "$state")"
+  printf '"recommendations":['
+  for index in "${!recommendations[@]}"; do
+    recommendation="${recommendations[$index]}"
+    (( index > 0 )) && printf ','
+    printf '"%s"' "$(json_escape "$recommendation")"
+  done
+  printf ']}'
+  printf '\n'
+}
+
+print_text() {
+  local recommendation
+  shiva_title "SHIVA ADVISOR v$SHIVA_VERSION"
+  printf 'History window: last %s event(s)\n' "$limit"
+  printf 'Failures: %s\n' "$fail_count"
+  printf 'Warnings: %s\n' "$warn_count"
+  [[ -n "$state" ]] && printf 'Watchdog state: %s\n' "$state"
+  printf '\nRecommendations\n'
+  if (( ${#recommendations[@]} == 0 )); then
+    printf 'No immediate recommendations.\n'
+    return 0
+  fi
+  for recommendation in "${recommendations[@]}"; do
+    printf '%s\n' "- $recommendation"
+  done
+}
 
 fail_count="$(history_count fail)"
 warn_count="$(history_count warn)"
 state="$(watchdog_state || true)"
-
-printf 'History window: last %s event(s)\n' "$limit"
-printf 'Failures: %s\n' "$fail_count"
-printf 'Warnings: %s\n' "$warn_count"
-[[ -n "$state" ]] && printf 'Watchdog state: %s\n' "$state"
-printf '\nRecommendations\n'
 
 if (( fail_count > 0 )); then
   recommend "Review recent failures with: shiva history --level fail"
@@ -87,6 +123,8 @@ if ! shiva_enabled "$SHIVA_WATCHDOG_AUTO_REPAIR"; then
   recommend "Keep auto-repair disabled until repair targets are verified on this host"
 fi
 
-if (( recommendations == 0 )); then
-  printf 'No immediate recommendations.\n'
+if [[ "$json" == true ]]; then
+  print_json
+else
+  print_text
 fi

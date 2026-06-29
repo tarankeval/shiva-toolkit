@@ -46,6 +46,15 @@ advisor_output="$(
 grep -q 'Recommendations' <<<"$advisor_output"
 grep -q 'shiva history --level fail' <<<"$advisor_output"
 
+advisor_json="$(
+  NO_COLOR=1 SHIVA_HISTORY_FILE="$history_file" \
+    SHIVA_WATCHDOG_STATE_FILE="$state_file" \
+    "$PROJECT_DIR/bin/shiva-advisor" --json 10
+)"
+grep -q '"history_window":10' <<<"$advisor_json"
+grep -q '"failures":1' <<<"$advisor_json"
+grep -q '"recommendations":\[' <<<"$advisor_json"
+
 repair_history="$stage/repair-history.log"
 repair_output="$(
   NO_COLOR=1 SHIVA_HISTORY_FILE="$repair_history" SHIVA_REPAIR_INTERFACE=lo \
