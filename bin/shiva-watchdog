@@ -24,7 +24,7 @@ while (($#)); do
 done
 
 watchdog_cycle() {
-  local failures=0 state root_percent raw_temp interface
+  local failures=0 state root_percent raw_temp interface previous_state current_state
 
   shiva_gateway_ok &&
     shiva_status ok "Gateway" "OK" ||
@@ -80,15 +80,29 @@ watchdog_cycle() {
     fi
   fi
 
+  previous_state=""
+  [[ -r "$SHIVA_WATCHDOG_STATE_FILE" ]] &&
+    previous_state="$(<"$SHIVA_WATCHDOG_STATE_FILE")"
+
   if (( failures > 0 )); then
-    shiva_history_add watchdog fail "$failures failure(s) detected"
-    if shiva_enabled "$SHIVA_WATCHDOG_AUTO_REPAIR"; then
+    current_state="fail:$failures"
+    if [[ "$previous_state" != fail:* ]]; then
+      shiva_history_add watchdog fail "$failures failure(s) detected"
+    fi
+    mkdir -p "$(dirname -- "$SHIVA_WATCHDOG_STATE_FILE")" 2>/dev/null || true
+    printf '%s\n' "$current_state" >"$SHIVA_WATCHDOG_STATE_FILE" 2>/dev/null || true
+    if [[ "$previous_state" != fail:* ]] && shiva_enabled "$SHIVA_WATCHDOG_AUTO_REPAIR"; then
       "$SCRIPT_DIR/shiva-repair" --apply network || true
     fi
     return 2
   fi
 
-  shiva_history_add watchdog ok "all checks passed"
+  current_state="ok"
+  if [[ "$previous_state" != "$current_state" ]]; then
+    shiva_history_add watchdog ok "all checks passed"
+  fi
+  mkdir -p "$(dirname -- "$SHIVA_WATCHDOG_STATE_FILE")" 2>/dev/null || true
+  printf '%s\n' "$current_state" >"$SHIVA_WATCHDOG_STATE_FILE" 2>/dev/null || true
   return 0
 }
 

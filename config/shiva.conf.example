@@ -38,6 +38,7 @@ SHIVA_CONNECT_TIMEOUT=3
 # Automation and repair.
 SHIVA_STATE_DIR="/var/lib/shiva"
 SHIVA_HISTORY_FILE="/var/lib/shiva/history.log"
+SHIVA_WATCHDOG_STATE_FILE="/var/lib/shiva/watchdog.state"
 SHIVA_REPAIR_INTERFACE=""
 SHIVA_OPENVPN_SERVICE=""
 SHIVA_WATCHDOG_INTERVAL=60
