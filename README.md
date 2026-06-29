@@ -95,6 +95,9 @@ Automatic repairs use `--verify-after` so the result is recorded in history.
 When Telegram is configured, watchdog can send notifications on state changes.
 Notifications support category cooldowns through `SHIVA_NOTIFY_COOLDOWN_SECONDS`.
 
+If a host does not run OpenVPN, set `CHECK_OPENVPN=false` in that host profile
+so watchdog and health checks do not report `OPENVPN NOT INSTALLED`.
+
 The watchdog is installed with a systemd unit:
 
 ```bash
