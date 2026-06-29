@@ -129,6 +129,16 @@ notify_status="$(
 grep -q 'Telegram' <<<"$notify_status"
 grep -q 'Cooldown' <<<"$notify_status"
 
+readonly_history_dir="$stage/readonly-history"
+mkdir -p "$readonly_history_dir"
+chmod 500 "$readonly_history_dir"
+readonly_history_error="$(
+  NO_COLOR=1 SHIVA_HISTORY_FILE="$readonly_history_dir/history.log" \
+    "$PROJECT_DIR/bin/shiva-notify" "history write should be silent" 2>&1 >/dev/null
+)"
+chmod 700 "$readonly_history_dir"
+[[ -z "$readonly_history_error" ]]
+
 service_plan="$(
   NO_COLOR=1 "$PROJECT_DIR/bin/shiva-service" enable
 )"

@@ -314,8 +314,10 @@ shiva_history_add() {
   local module="$1" level="$2" message="$3" dir
   dir="$(dirname -- "$SHIVA_HISTORY_FILE")"
   mkdir -p "$dir" 2>/dev/null || return 0
-  printf '%s\t%s\t%s\t%s\n' "$(date -Iseconds)" "$level" "$module" "$message" \
-    >>"$SHIVA_HISTORY_FILE" 2>/dev/null || return 0
+  {
+    printf '%s\t%s\t%s\t%s\n' "$(date -Iseconds)" "$level" "$module" "$message" \
+      >>"$SHIVA_HISTORY_FILE"
+  } 2>/dev/null || return 0
 }
 
 shiva_connectivity_ok() {
