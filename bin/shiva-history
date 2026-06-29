@@ -7,10 +7,13 @@ shiva_load_common
 limit=50
 module_filter=""
 level_filter=""
+summary=false
+history_tmp="$(mktemp "${TMPDIR:-/tmp}/shiva-history.XXXXXX")" || exit 1
+trap 'rm -f "$history_tmp"' EXIT
 
 usage() {
   cat <<'EOF'
-Usage: shiva history [--module name] [--level level] [lines]
+Usage: shiva history [--summary] [--module name] [--level level] [lines]
 
 Show recent Shiva Toolkit operational history.
 EOF
@@ -21,6 +24,9 @@ while (($#)); do
   -h|--help|help)
     usage
     exit 0
+    ;;
+  --summary)
+    summary=true
     ;;
   --module)
     shift
@@ -68,8 +74,28 @@ awk -F '\t' -v module_filter="$module_filter" -v level_filter="$level_filter" '
     (module_filter == "" || $3 == module_filter) &&
     (level_filter == "" || $2 == level_filter) { print }
   ' "$SHIVA_HISTORY_FILE" |
-  tail -n "$limit" |
+  tail -n "$limit" >"$history_tmp"
+
+if [[ "$summary" == true ]]; then
   awk -F '\t' '
+    {
+      level[$2] += 1
+      module[$3] += 1
+      total += 1
+    }
+    END {
+      printf "Total: %d\n\n", total
+      print "By level"
+      for (name in level) printf "  %-12s %d\n", name, level[name]
+      print ""
+      print "By module"
+      for (name in module) printf "  %-12s %d\n", name, module[name]
+    }
+  ' "$history_tmp"
+  exit 0
+fi
+
+awk -F '\t' '
     {
       split($1, parts, "T")
       day = parts[1]
@@ -80,4 +106,4 @@ awk -F '\t' -v module_filter="$module_filter" -v level_filter="$level_filter" '
       }
       printf "  %-5s %-12s %s\n", $2, $3, $4
     }
-  '
+  ' "$history_tmp"

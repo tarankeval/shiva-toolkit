@@ -61,6 +61,7 @@ shiva watchdog --once
 shiva watchdog --status
 shiva watchdog --config
 shiva history
+shiva history --summary
 shiva history --module watchdog
 shiva history --level fail
 shiva notify status

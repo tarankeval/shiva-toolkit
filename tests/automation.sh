@@ -30,6 +30,14 @@ history_fail_output="$(
 grep -q '2 failure(s) detected' <<<"$history_fail_output"
 ! grep -q 'all checks passed' <<<"$history_fail_output"
 
+history_summary="$(
+  NO_COLOR=1 SHIVA_HISTORY_FILE="$history_file" \
+    "$PROJECT_DIR/bin/shiva-history" --summary 10
+)"
+grep -q 'Total: 3' <<<"$history_summary"
+grep -q 'By level' <<<"$history_summary"
+grep -q 'watchdog' <<<"$history_summary"
+
 repair_history="$stage/repair-history.log"
 repair_output="$(
   NO_COLOR=1 SHIVA_HISTORY_FILE="$repair_history" SHIVA_REPAIR_INTERFACE=lo \
