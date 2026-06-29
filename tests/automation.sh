@@ -148,6 +148,25 @@ nodes_json="$(
 grep -q '"nodes":\[' <<<"$nodes_json"
 grep -q '"name":"vpn"' <<<"$nodes_json"
 
+cluster_output="$(
+  NO_COLOR=1 SHIVA_HISTORY_FILE="$history_file" \
+    SHIVA_WATCHDOG_STATE_FILE="$state_file" \
+    SHIVA_NODES="local:server:localhost vpn:VPN:shiva-vpn" \
+    "$PROJECT_DIR/bin/shiva-cluster" 10
+)"
+grep -q 'SHIVA CLUSTER' <<<"$cluster_output"
+grep -q 'Nodes' <<<"$cluster_output"
+grep -q 'Advisor' <<<"$cluster_output"
+
+cluster_json="$(
+  NO_COLOR=1 SHIVA_HISTORY_FILE="$history_file" \
+    SHIVA_WATCHDOG_STATE_FILE="$state_file" \
+    SHIVA_NODES="local:server:localhost vpn:VPN:shiva-vpn" \
+    "$PROJECT_DIR/bin/shiva-cluster" --json 10
+)"
+grep -q '"nodes":2' <<<"$cluster_json"
+grep -q '"configured_nodes":1' <<<"$cluster_json"
+
 printf 'ok\n' >"$state_file"
 NO_COLOR=1 SHIVA_WATCHDOG_STATE_FILE="$state_file" \
   "$PROJECT_DIR/bin/shiva-watchdog" --status >/dev/null

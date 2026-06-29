@@ -1,0 +1,122 @@
+#!/usr/bin/env bash
+set -u
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../lib/shiva/bootstrap.sh" 2>/dev/null || source /usr/local/lib/shiva/bootstrap.sh
+shiva_load_common
+
+json=false
+limit=50
+
+usage() {
+  cat <<'EOF'
+Usage: shiva cluster [--json] [history-lines]
+
+Show a compact infrastructure overview built from local dashboard and nodes.
+Remote node health checks are not performed yet.
+EOF
+}
+
+while (($#)); do
+  case "$1" in
+    --json) json=true ;;
+    -h|--help|help) usage; exit 0 ;;
+    *) limit="$1" ;;
+  esac
+  shift
+done
+
+if [[ ! "$limit" =~ ^[0-9]+$ ]]; then
+  printf 'Cluster history line count must be a number.\n' >&2
+  exit 1
+fi
+
+node_counts() {
+  local entry host status total=0 local_count=0 configured_count=0
+  for entry in $SHIVA_NODES; do
+    IFS=':' read -r _name _role host _extra <<<"$entry"
+    [[ -n "${_name:-}" ]] || continue
+    [[ -n "${host:-}" ]] || host="$_name"
+    ((total+=1))
+    if [[ "$host" == "$SHIVA_HOSTNAME" || "$host" == "localhost" || "$host" == "127.0.0.1" ]]; then
+      ((local_count+=1))
+    else
+      ((configured_count+=1))
+    fi
+  done
+  printf '%s %s %s' "$total" "$local_count" "$configured_count"
+}
+
+dashboard_value() {
+  local key="$1"
+  "$SCRIPT_DIR/shiva-dashboard" --json "$limit" 2>/dev/null |
+    sed -n "s/.*\"$key\":\\([^,}]*\\).*/\\1/p" |
+    sed 's/^"//;s/"$//'
+}
+
+read -r node_total node_local node_configured < <(node_counts)
+failures="$(dashboard_value failures)"
+warnings="$(dashboard_value warnings)"
+advisor_recommendations="$(dashboard_value advisor_recommendations)"
+watchdog="$(dashboard_value watchdog)"
+service="$(dashboard_value service)"
+telegram="$(dashboard_value telegram)"
+
+: "${failures:=0}"
+: "${warnings:=0}"
+: "${advisor_recommendations:=0}"
+: "${watchdog:=unknown}"
+: "${service:=unknown}"
+: "${telegram:=disabled}"
+
+if [[ "$json" == true ]]; then
+  printf '{'
+  printf '"nodes":%s,' "$node_total"
+  printf '"local_nodes":%s,' "$node_local"
+  printf '"configured_nodes":%s,' "$node_configured"
+  printf '"failures":%s,' "$failures"
+  printf '"warnings":%s,' "$warnings"
+  printf '"advisor_recommendations":%s,' "$advisor_recommendations"
+  printf '"watchdog":"%s",' "$watchdog"
+  printf '"service":"%s",' "$service"
+  printf '"telegram":"%s"' "$telegram"
+  printf '}\n'
+  exit 0
+fi
+
+shiva_title "SHIVA CLUSTER v$SHIVA_VERSION"
+shiva_status ok "Nodes" "$node_total total, $node_local local, $node_configured configured"
+
+case "$watchdog" in
+  ok) shiva_status ok "Watchdog" "OK" ;;
+  fail:*) shiva_status fail "Watchdog" "$watchdog" ;;
+  *) shiva_status warn "Watchdog" "$watchdog" ;;
+esac
+
+case "$service" in
+  active) shiva_status ok "Service" "$service" ;;
+  inactive|failed) shiva_status fail "Service" "$service" ;;
+  *) shiva_status warn "Service" "$service" ;;
+esac
+
+if (( failures > 0 )); then
+  shiva_status fail "Failures" "$failures"
+else
+  shiva_status ok "Failures" "$failures"
+fi
+
+if (( warnings > 0 )); then
+  shiva_status warn "Warnings" "$warnings"
+else
+  shiva_status ok "Warnings" "$warnings"
+fi
+
+if (( advisor_recommendations > 0 )); then
+  shiva_status warn "Advisor" "$advisor_recommendations recommendation(s)"
+else
+  shiva_status ok "Advisor" "NO IMMEDIATE RECOMMENDATIONS"
+fi
+
+case "$telegram" in
+  enabled) shiva_status ok "Telegram" "ENABLED" ;;
+  *) shiva_status warn "Telegram" "DISABLED" ;;
+esac
