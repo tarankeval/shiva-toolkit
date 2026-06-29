@@ -80,6 +80,7 @@ shiva advisor --json
 shiva advisor --notify
 shiva dashboard
 shiva dashboard --json
+shiva dashboard --watch --interval 5
 shiva notify status
 shiva notify --dry-run "test message"
 shiva service status

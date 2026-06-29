@@ -6,10 +6,13 @@ shiva_load_common
 
 limit=50
 json=false
+watch=false
+interval="${SHIVA_DASHBOARD_INTERVAL:-5}"
+count=0
 
 usage() {
   cat <<'EOF'
-Usage: shiva dashboard [--json] [history-lines]
+Usage: shiva dashboard [--json] [--watch] [--interval seconds] [--count cycles] [history-lines]
 
 Show a compact operational dashboard for Shiva Toolkit.
 EOF
@@ -18,6 +21,29 @@ EOF
 while (($#)); do
   case "$1" in
     --json) json=true ;;
+    --watch) watch=true ;;
+    --interval)
+      shift
+      if [[ -z "${1:-}" ]]; then
+        printf 'Missing seconds after --interval.\n' >&2
+        exit 1
+      fi
+      interval="$1"
+      ;;
+    --interval=*)
+      interval="${1#--interval=}"
+      ;;
+    --count)
+      shift
+      if [[ -z "${1:-}" ]]; then
+        printf 'Missing cycles after --count.\n' >&2
+        exit 1
+      fi
+      count="$1"
+      ;;
+    --count=*)
+      count="${1#--count=}"
+      ;;
     -h|--help|help) usage; exit 0 ;;
     *) limit="$1" ;;
   esac
@@ -26,6 +52,18 @@ done
 
 if [[ ! "$limit" =~ ^[0-9]+$ ]]; then
   printf 'Dashboard history line count must be a number.\n' >&2
+  exit 1
+fi
+if [[ ! "$interval" =~ ^[0-9]+$ ]]; then
+  printf 'Dashboard interval must be a number.\n' >&2
+  exit 1
+fi
+if [[ ! "$count" =~ ^[0-9]+$ ]]; then
+  printf 'Dashboard count must be a number.\n' >&2
+  exit 1
+fi
+if [[ "$json" == true && "$watch" == true ]]; then
+  printf 'Dashboard --json cannot be combined with --watch.\n' >&2
   exit 1
 fi
 
@@ -81,16 +119,18 @@ json_escape() {
   printf '%s' "$value"
 }
 
-state="$(watchdog_state)"
-service="$(service_state)"
-fail_count="$(history_count fail)"
-warn_count="$(history_count warn)"
-info_count="$(history_count info)"
-advisor_count="$(recommendation_count)"
-[[ -n "$advisor_count" ]] || advisor_count=0
-nodes="$(node_count)"
+collect_dashboard_state() {
+  state="$(watchdog_state)"
+  service="$(service_state)"
+  fail_count="$(history_count fail)"
+  warn_count="$(history_count warn)"
+  info_count="$(history_count info)"
+  advisor_count="$(recommendation_count)"
+  [[ -n "$advisor_count" ]] || advisor_count=0
+  nodes="$(node_count)"
+}
 
-if [[ "$json" == true ]]; then
+render_dashboard_json() {
   printf '{'
   printf '"watchdog":"%s",' "$(json_escape "$state")"
   printf '"service":"%s",' "$(json_escape "$service")"
@@ -105,54 +145,79 @@ if [[ "$json" == true ]]; then
     printf '"telegram":"disabled"'
   fi
   printf '}\n'
+}
+
+render_dashboard_text() {
+  shiva_title "SHIVA DASHBOARD v$SHIVA_VERSION"
+
+  if [[ "$watch" == true ]]; then
+    shiva_status ok "Refresh" "${interval}s"
+  fi
+
+  case "$state" in
+    ok) shiva_status ok "Watchdog" "OK" ;;
+    fail:*) shiva_status fail "Watchdog" "$state" ;;
+    "NO DATA") shiva_status warn "Watchdog" "NO DATA" ;;
+    *) shiva_status warn "Watchdog" "$state" ;;
+  esac
+
+  case "$service" in
+    active) shiva_status ok "Service" "active" ;;
+    inactive|failed) shiva_status fail "Service" "$service" ;;
+    UNAVAILABLE) shiva_status warn "Service" "UNAVAILABLE" ;;
+    *) shiva_status warn "Service" "$service" ;;
+  esac
+
+  if (( fail_count > 0 )); then
+    shiva_status fail "Failures" "$fail_count"
+  else
+    shiva_status ok "Failures" "$fail_count"
+  fi
+  if (( warn_count > 0 )); then
+    shiva_status warn "Warnings" "$warn_count"
+  else
+    shiva_status ok "Warnings" "$warn_count"
+  fi
+  shiva_status ok "Info events" "$info_count"
+  shiva_status ok "Nodes" "$nodes"
+
+  if (( advisor_count > 0 )); then
+    shiva_status warn "Advisor" "$advisor_count recommendation(s)"
+  else
+    shiva_status ok "Advisor" "NO IMMEDIATE RECOMMENDATIONS"
+  fi
+
+  if shiva_enabled "$SHIVA_TELEGRAM_ENABLED"; then
+    shiva_status ok "Telegram" "ENABLED"
+  else
+    shiva_status warn "Telegram" "DISABLED"
+  fi
+
+  printf '\nRecent failures:\n'
+  if [[ -r "$SHIVA_HISTORY_FILE" ]]; then
+    tail -n "$limit" "$SHIVA_HISTORY_FILE" |
+      awk -F '\t' '$2 == "fail" {printf "  %s %-12s %s\n", $1, $3, $4; shown += 1} END {exit shown == 0}'
+  else
+    false
+  fi || printf '  none\n'
+}
+
+if [[ "$json" == true ]]; then
+  collect_dashboard_state
+  render_dashboard_json
   exit 0
 fi
 
-shiva_title "SHIVA DASHBOARD v$SHIVA_VERSION"
-
-case "$state" in
-  ok) shiva_status ok "Watchdog" "OK" ;;
-  fail:*) shiva_status fail "Watchdog" "$state" ;;
-  "NO DATA") shiva_status warn "Watchdog" "NO DATA" ;;
-  *) shiva_status warn "Watchdog" "$state" ;;
-esac
-
-case "$service" in
-  active) shiva_status ok "Service" "active" ;;
-  inactive|failed) shiva_status fail "Service" "$service" ;;
-  UNAVAILABLE) shiva_status warn "Service" "UNAVAILABLE" ;;
-  *) shiva_status warn "Service" "$service" ;;
-esac
-
-if (( fail_count > 0 )); then
-  shiva_status fail "Failures" "$fail_count"
-else
-  shiva_status ok "Failures" "$fail_count"
-fi
-if (( warn_count > 0 )); then
-  shiva_status warn "Warnings" "$warn_count"
-else
-  shiva_status ok "Warnings" "$warn_count"
-fi
-shiva_status ok "Info events" "$info_count"
-shiva_status ok "Nodes" "$nodes"
-
-if (( advisor_count > 0 )); then
-  shiva_status warn "Advisor" "$advisor_count recommendation(s)"
-else
-  shiva_status ok "Advisor" "NO IMMEDIATE RECOMMENDATIONS"
-fi
-
-if shiva_enabled "$SHIVA_TELEGRAM_ENABLED"; then
-  shiva_status ok "Telegram" "ENABLED"
-else
-  shiva_status warn "Telegram" "DISABLED"
-fi
-
-printf '\nRecent failures:\n'
-if [[ -r "$SHIVA_HISTORY_FILE" ]]; then
-  tail -n "$limit" "$SHIVA_HISTORY_FILE" |
-    awk -F '\t' '$2 == "fail" {printf "  %s %-12s %s\n", $1, $3, $4; shown += 1} END {exit shown == 0}'
-else
-  false
-fi || printf '  none\n'
+cycles=0
+while true; do
+  if [[ "$watch" == true ]]; then
+    clear 2>/dev/null || true
+  fi
+  collect_dashboard_state
+  render_dashboard_text
+  ((cycles+=1))
+  if [[ "$watch" != true ]] || { (( count > 0 )) && (( cycles >= count )); }; then
+    break
+  fi
+  sleep "$interval"
+done

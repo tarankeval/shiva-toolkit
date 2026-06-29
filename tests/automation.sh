@@ -109,6 +109,15 @@ grep -q '"service":' <<<"$dashboard_json"
 grep -q '"nodes":2' <<<"$dashboard_json"
 grep -q '"telegram":"disabled"' <<<"$dashboard_json"
 
+dashboard_watch_output="$(
+  NO_COLOR=1 SHIVA_HISTORY_FILE="$history_file" \
+    SHIVA_NODES="local:server:localhost vpn:VPN:shiva-vpn" \
+    SHIVA_WATCHDOG_STATE_FILE="$state_file" \
+    "$PROJECT_DIR/bin/shiva-dashboard" --watch --interval 0 --count 1 10
+)"
+grep -q 'Refresh' <<<"$dashboard_watch_output"
+grep -q 'Recent failures' <<<"$dashboard_watch_output"
+
 repair_history="$stage/repair-history.log"
 repair_output="$(
   NO_COLOR=1 SHIVA_HISTORY_FILE="$repair_history" SHIVA_REPAIR_INTERFACE=lo \

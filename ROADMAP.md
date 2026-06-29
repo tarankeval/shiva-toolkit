@@ -168,6 +168,12 @@ Acceptance criteria:
 - it uses the same status model as `shiva-health`;
 - it remains useful over SSH.
 
+Initial implementation status:
+
+- `shiva dashboard` renders a compact one-shot terminal overview;
+- `shiva dashboard --watch --interval 5` refreshes the dashboard over SSH;
+- `shiva dashboard --json` exposes the same summary for future tooling.
+
 ### Module Logs
 
 Add targeted log views:
