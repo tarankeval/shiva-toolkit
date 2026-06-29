@@ -55,6 +55,13 @@ grep -q '"history_window":10' <<<"$advisor_json"
 grep -q '"failures":1' <<<"$advisor_json"
 grep -q '"recommendations":\[' <<<"$advisor_json"
 
+NO_COLOR=1 SHIVA_HISTORY_FILE="$history_file" \
+  SHIVA_WATCHDOG_STATE_FILE="$state_file" \
+  SHIVA_NOTIFY_STATE_DIR="$stage/notify" \
+  SHIVA_TELEGRAM_ENABLED=false \
+  "$PROJECT_DIR/bin/shiva-advisor" --notify 10 >/dev/null
+grep -q 'notification skipped: telegram disabled' "$history_file"
+
 repair_history="$stage/repair-history.log"
 repair_output="$(
   NO_COLOR=1 SHIVA_HISTORY_FILE="$repair_history" SHIVA_REPAIR_INTERFACE=lo \

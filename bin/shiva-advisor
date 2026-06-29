@@ -6,10 +6,11 @@ shiva_load_common
 
 limit=100
 json=false
+notify=false
 
 usage() {
   cat <<'EOF'
-Usage: shiva advisor [--json] [lines]
+Usage: shiva advisor [--json] [--notify] [lines]
 
 Show deterministic recommendations based on Shiva configuration and history.
 EOF
@@ -18,6 +19,7 @@ EOF
 while (($#)); do
   case "$1" in
     --json) json=true ;;
+    --notify) notify=true ;;
     -h|--help|help) usage; exit 0 ;;
     *) limit="$1" ;;
   esac
@@ -91,6 +93,16 @@ print_text() {
   done
 }
 
+notify_recommendations() {
+  local recommendation message
+  (( ${#recommendations[@]} > 0 )) || return 0
+  message="Shiva Advisor recommendations:"
+  for recommendation in "${recommendations[@]}"; do
+    message+=$'\n- '"$recommendation"
+  done
+  "$SCRIPT_DIR/shiva-notify" --category advisor "$message"
+}
+
 fail_count="$(history_count fail)"
 warn_count="$(history_count warn)"
 state="$(watchdog_state || true)"
@@ -127,4 +139,8 @@ if [[ "$json" == true ]]; then
   print_json
 else
   print_text
+fi
+
+if [[ "$notify" == true ]]; then
+  notify_recommendations
 fi

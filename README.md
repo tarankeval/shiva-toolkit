@@ -67,6 +67,7 @@ shiva history --module watchdog
 shiva history --level fail
 shiva advisor
 shiva advisor --json
+shiva advisor --notify
 shiva notify status
 shiva notify --dry-run "test message"
 ```
