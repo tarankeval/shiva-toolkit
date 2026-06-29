@@ -25,6 +25,11 @@ grep -q 'service  Manage Shiva systemd services' <<<"$help_output"
 grep -q 'nodes    Show configured node inventory' <<<"$help_output"
 grep -q 'cluster  Show compact infrastructure overview' <<<"$help_output"
 NO_COLOR=1 "$PROJECT_DIR/bin/shiva-doctor" >/dev/null || [[ $? -eq 2 ]]
+NO_COLOR=1 SHIVA_STATE_DIR="$stage/state" \
+  SHIVA_HISTORY_FILE="$stage/state/history.log" \
+  SHIVA_WATCHDOG_STATE_FILE="$stage/state/watchdog.state" \
+  SHIVA_NOTIFY_STATE_DIR="$stage/state/notify" \
+  "$PROJECT_DIR/bin/shiva-doctor" state >/dev/null
 NO_COLOR=1 SHIVA_HISTORY_FILE="$stage_history" "$PROJECT_DIR/bin/shiva-history" >/dev/null
 NO_COLOR=1 "$PROJECT_DIR/bin/shiva-repair" --help >/dev/null
 NO_COLOR=1 "$PROJECT_DIR/bin/shiva-watchdog" --help >/dev/null

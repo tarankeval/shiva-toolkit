@@ -139,6 +139,16 @@ readonly_history_error="$(
 chmod 700 "$readonly_history_dir"
 [[ -z "$readonly_history_error" ]]
 
+doctor_state_output="$(
+  NO_COLOR=1 SHIVA_STATE_DIR="$stage/state" \
+    SHIVA_HISTORY_FILE="$stage/state/history.log" \
+    SHIVA_WATCHDOG_STATE_FILE="$stage/state/watchdog.state" \
+    SHIVA_NOTIFY_STATE_DIR="$stage/state/notify" \
+    "$PROJECT_DIR/bin/shiva-doctor" state
+)"
+grep -q 'SHIVA DOCTOR STATE' <<<"$doctor_state_output"
+grep -q 'WRITABLE' <<<"$doctor_state_output"
+
 service_plan="$(
   NO_COLOR=1 "$PROJECT_DIR/bin/shiva-service" enable
 )"

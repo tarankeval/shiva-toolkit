@@ -4,6 +4,57 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../lib/shiva/bootstrap.sh" 2>/dev/null || source /usr/local/lib/shiva/bootstrap.sh
 shiva_load_common
 
+show_state_diagnostics() {
+  local issues=0 path dir tmp_file seen_paths=""
+  shiva_title "SHIVA DOCTOR STATE"
+
+  for path in "$SHIVA_STATE_DIR" "$(dirname -- "$SHIVA_HISTORY_FILE")" \
+    "$(dirname -- "$SHIVA_WATCHDOG_STATE_FILE")" "$SHIVA_NOTIFY_STATE_DIR"; do
+    case " $seen_paths " in
+      *" $path "*) continue ;;
+    esac
+    seen_paths+=" $path"
+    if [[ -d "$path" ]]; then
+      shiva_status ok "$path" "DIRECTORY"
+    elif mkdir -p "$path" 2>/dev/null; then
+      shiva_status ok "$path" "CREATED"
+    else
+      shiva_status warn "$path" "MISSING"
+      ((issues+=1))
+    fi
+  done
+
+  for path in "$SHIVA_HISTORY_FILE" "$SHIVA_WATCHDOG_STATE_FILE"; do
+    dir="$(dirname -- "$path")"
+    tmp_file="$dir/.shiva-write-test.$$"
+    if mkdir -p "$dir" 2>/dev/null && { printf 'test\n' >"$tmp_file"; } 2>/dev/null; then
+      rm -f "$tmp_file"
+      shiva_status ok "$path" "WRITABLE"
+    else
+      shiva_status warn "$path" "NOT WRITABLE"
+      ((issues+=1))
+    fi
+  done
+
+  if (( issues > 0 )); then
+    printf '\nRun sudo ./install.sh or configure SHIVA_HISTORY_FILE and SHIVA_WATCHDOG_STATE_FILE to writable paths.\n'
+    return 1
+  fi
+  return 0
+}
+
+case "${1:-}" in
+  state) show_state_diagnostics; exit $? ;;
+  -h|--help|help)
+    cat <<'EOF'
+Usage: shiva doctor [state]
+
+Diagnose toolkit dependencies, host setup, and optional state paths.
+EOF
+    exit 0
+    ;;
+esac
+
 shiva_title "SHIVA DOCTOR"
 shiva_status ok "Release" "$(shiva_version_string) $SHIVA_RELEASE"
 shiva_status ok "Hostname" "$SHIVA_HOSTNAME"
