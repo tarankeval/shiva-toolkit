@@ -44,6 +44,10 @@ fi
 : "${SHIVA_WATCHDOG_INTERVAL:=60}"
 : "${SHIVA_WATCHDOG_AUTO_REPAIR:=false}"
 : "${SHIVA_WATCHDOG_REPAIR_TARGETS:=network dns openvpn}"
+: "${SHIVA_NOTIFY_ON_WATCHDOG:=true}"
+: "${SHIVA_TELEGRAM_ENABLED:=false}"
+: "${SHIVA_TELEGRAM_BOT_TOKEN:=}"
+: "${SHIVA_TELEGRAM_CHAT_ID:=}"
 
 shiva_detect_hostname() {
   local detected

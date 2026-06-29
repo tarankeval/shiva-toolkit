@@ -93,6 +93,12 @@ run_auto_repairs() {
   done
 }
 
+notify_watchdog() {
+  local level="$1" message="$2"
+  shiva_enabled "$SHIVA_NOTIFY_ON_WATCHDOG" || return 0
+  "$SCRIPT_DIR/shiva-notify" "[$level] $SHIVA_HOSTNAME: $message" || true
+}
+
 watchdog_cycle() {
   local failures=0 state root_percent raw_temp interface previous_state current_state targets
   local -a repair_targets=()
@@ -163,8 +169,10 @@ watchdog_cycle() {
     if [[ "$previous_state" != "$current_state" ]]; then
       if [[ -n "$targets" ]]; then
         shiva_history_add watchdog fail "$failures failure(s) detected; repair targets: $targets"
+        notify_watchdog fail "$failures failure(s) detected; repair targets: $targets"
       else
         shiva_history_add watchdog fail "$failures failure(s) detected"
+        notify_watchdog fail "$failures failure(s) detected"
       fi
     fi
     mkdir -p "$(dirname -- "$SHIVA_WATCHDOG_STATE_FILE")" 2>/dev/null || true
@@ -178,6 +186,7 @@ watchdog_cycle() {
   current_state="ok"
   if [[ "$previous_state" != "$current_state" ]]; then
     shiva_history_add watchdog ok "all checks passed"
+    notify_watchdog ok "all checks passed"
   fi
   mkdir -p "$(dirname -- "$SHIVA_WATCHDOG_STATE_FILE")" 2>/dev/null || true
   printf '%s\n' "$current_state" >"$SHIVA_WATCHDOG_STATE_FILE" 2>/dev/null || true

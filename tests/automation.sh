@@ -39,6 +39,12 @@ grep -q 'Default mode' <<<"$repair_status"
 grep -q 'DRY RUN' <<<"$repair_status"
 grep -q 'Network target' <<<"$repair_status"
 
+notify_output="$(
+  NO_COLOR=1 "$PROJECT_DIR/bin/shiva-notify" --dry-run "test message"
+)"
+grep -q 'DRY RUN' <<<"$notify_output"
+grep -q 'test message' <<<"$notify_output"
+
 printf 'ok\n' >"$state_file"
 NO_COLOR=1 SHIVA_WATCHDOG_STATE_FILE="$state_file" \
   "$PROJECT_DIR/bin/shiva-watchdog" --status >/dev/null

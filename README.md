@@ -39,6 +39,7 @@ shiva-doctor      Toolkit and host diagnostics
 shiva-repair      Guided dry-run or applied repairs
 shiva-watchdog    Automation checks for service supervision
 shiva-history     Local operational history
+shiva-notify      Configured notifications
 shiva-logs        Recent warning/error logs
 shiva-backup      Backup freshness check
 ```
@@ -59,6 +60,7 @@ shiva watchdog --once
 shiva watchdog --status
 shiva history
 shiva history --module watchdog
+shiva notify --dry-run "test message"
 ```
 
 `shiva repair` runs in dry-run mode by default and prints planned actions.
@@ -67,6 +69,7 @@ running with the required permissions.
 
 When `SHIVA_WATCHDOG_AUTO_REPAIR=true`, watchdog maps failures to repair
 targets and only runs targets allowed by `SHIVA_WATCHDOG_REPAIR_TARGETS`.
+When Telegram is configured, watchdog can send notifications on state changes.
 
 The watchdog is installed with a systemd unit:
 

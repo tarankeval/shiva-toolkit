@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+set -u
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../lib/shiva/bootstrap.sh" 2>/dev/null || source /usr/local/lib/shiva/bootstrap.sh
+shiva_load_common
+
+dry_run=false
+
+usage() {
+  cat <<'EOF'
+Usage: shiva notify [--dry-run] <message>
+
+Send a configured Shiva Toolkit notification. Telegram is disabled by default.
+EOF
+}
+
+while (($#)); do
+  case "$1" in
+    --dry-run) dry_run=true; shift ;;
+    -h|--help|help) usage; exit 0 ;;
+    *) break ;;
+  esac
+done
+
+message="$*"
+if [[ -z "$message" ]]; then
+  usage >&2
+  exit 1
+fi
+
+if [[ "$dry_run" == true ]]; then
+  shiva_title "SHIVA NOTIFY v$SHIVA_VERSION"
+  shiva_status ok "Mode" "DRY RUN"
+  printf '%s\n' "$message"
+  exit 0
+fi
+
+if ! shiva_enabled "$SHIVA_TELEGRAM_ENABLED"; then
+  shiva_history_add notify info "notification skipped: telegram disabled"
+  exit 0
+fi
+
+if [[ -z "$SHIVA_TELEGRAM_BOT_TOKEN" || -z "$SHIVA_TELEGRAM_CHAT_ID" ]]; then
+  printf 'Telegram notification is enabled but token or chat ID is missing.\n' >&2
+  shiva_history_add notify warn "telegram enabled but token or chat ID is missing"
+  exit 1
+fi
+
+if ! shiva_have curl; then
+  printf 'curl is required for Telegram notifications.\n' >&2
+  shiva_history_add notify warn "telegram notification failed: curl not installed"
+  exit 1
+fi
+
+if curl -fsS \
+  --data-urlencode "chat_id=$SHIVA_TELEGRAM_CHAT_ID" \
+  --data-urlencode "text=$message" \
+  "https://api.telegram.org/bot${SHIVA_TELEGRAM_BOT_TOKEN}/sendMessage" \
+  >/dev/null; then
+  shiva_history_add notify ok "telegram notification sent"
+else
+  shiva_history_add notify fail "telegram notification failed"
+  exit 1
+fi

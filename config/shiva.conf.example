@@ -44,6 +44,12 @@ SHIVA_OPENVPN_SERVICE=""
 SHIVA_WATCHDOG_INTERVAL=60
 SHIVA_WATCHDOG_AUTO_REPAIR=false
 SHIVA_WATCHDOG_REPAIR_TARGETS="network dns openvpn"
+SHIVA_NOTIFY_ON_WATCHDOG=true
+
+# Telegram notifications. Keep token and chat ID outside git-tracked files.
+SHIVA_TELEGRAM_ENABLED=false
+SHIVA_TELEGRAM_BOT_TOKEN=""
+SHIVA_TELEGRAM_CHAT_ID=""
 
 # Backup freshness check.
 SHIVA_BACKUP_DIR="/var/backups"
