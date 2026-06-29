@@ -123,6 +123,11 @@ notify_status="$(
 grep -q 'Telegram' <<<"$notify_status"
 grep -q 'Cooldown' <<<"$notify_status"
 
+service_plan="$(
+  NO_COLOR=1 "$PROJECT_DIR/bin/shiva-service" enable
+)"
+grep -q 'PLAN systemctl enable shiva-watchdog' <<<"$service_plan"
+
 printf 'ok\n' >"$state_file"
 NO_COLOR=1 SHIVA_WATCHDOG_STATE_FILE="$state_file" \
   "$PROJECT_DIR/bin/shiva-watchdog" --status >/dev/null

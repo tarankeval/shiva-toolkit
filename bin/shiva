@@ -38,6 +38,7 @@ Commands:
   help_text+=$'\n  advisor  Show operational recommendations'
   help_text+=$'\n  dashboard Show compact operational dashboard'
   help_text+=$'\n  notify   Send configured notifications'
+  help_text+=$'\n  service  Manage Shiva systemd services'
   help_text+=$'\n  logs     Show important system logs'
   help_text+=$'\n  backup   Inspect configured backups'
   printf '%s\n' "$help_text"
@@ -57,8 +58,8 @@ show_menu() {
       menu_labels+=("Docker")
       menu_commands+=("docker")
     fi
-    menu_labels+=("System Update" "Repair / Doctor" "Guided Repair" "Watchdog" "History" "Advisor" "Dashboard" "Notify" "Logs" "Backups")
-    menu_commands+=("update" "doctor" "repair" "watchdog" "history" "advisor" "dashboard" "notify" "logs" "backup")
+    menu_labels+=("System Update" "Repair / Doctor" "Guided Repair" "Watchdog" "History" "Advisor" "Dashboard" "Notify" "Service" "Logs" "Backups")
+    menu_commands+=("update" "doctor" "repair" "watchdog" "history" "advisor" "dashboard" "notify" "service" "logs" "backup")
 
     clear 2>/dev/null || true
     shiva_title "SHIVA TOOLKIT v$SHIVA_VERSION"

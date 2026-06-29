@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+set -u
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../lib/shiva/bootstrap.sh" 2>/dev/null || source /usr/local/lib/shiva/bootstrap.sh
+shiva_load_common
+
+apply=false
+action="status"
+service="shiva-watchdog"
+
+usage() {
+  cat <<'EOF'
+Usage: shiva service [--apply] [status|enable|disable|start|stop|restart]
+
+Inspect or manage the shiva-watchdog systemd service.
+Mutating actions require --apply.
+EOF
+}
+
+while (($#)); do
+  case "$1" in
+    --apply) apply=true ;;
+    status|enable|disable|start|stop|restart) action="$1" ;;
+    -h|--help|help) usage; exit 0 ;;
+    *) printf 'Unknown service option: %s\n' "$1" >&2; usage >&2; exit 1 ;;
+  esac
+  shift
+done
+
+systemctl_available() {
+  shiva_have systemctl
+}
+
+service_status() {
+  local active enabled
+  shiva_title "SHIVA SERVICE v$SHIVA_VERSION"
+  if ! systemctl_available; then
+    shiva_status warn "systemctl" "UNAVAILABLE"
+    return 1
+  fi
+
+  if systemctl is-active --quiet "$service" 2>/dev/null; then
+    active="ACTIVE"
+    shiva_status ok "Service" "$active"
+  else
+    active="$(systemctl is-active "$service" 2>/dev/null || true)"
+    [[ -n "$active" ]] || active="UNKNOWN"
+    shiva_status warn "Service" "$active"
+  fi
+
+  enabled="$(systemctl is-enabled "$service" 2>/dev/null || true)"
+  case "$enabled" in
+    enabled) shiva_status ok "Enabled" "$enabled" ;;
+    disabled) shiva_status warn "Enabled" "$enabled" ;;
+    *) shiva_status warn "Enabled" "${enabled:-UNKNOWN}" ;;
+  esac
+}
+
+run_service_action() {
+  local verb="$1"
+  if ! systemctl_available; then
+    printf 'systemctl is unavailable.\n' >&2
+    return 1
+  fi
+  if [[ "$apply" != true ]]; then
+    printf 'PLAN systemctl %s %s\n' "$verb" "$service"
+    return 0
+  fi
+  shiva_require_root || return 1
+  printf 'RUN  systemctl %s %s\n' "$verb" "$service"
+  systemctl "$verb" "$service"
+}
+
+case "$action" in
+  status) service_status ;;
+  enable) run_service_action enable ;;
+  disable) run_service_action disable ;;
+  start) run_service_action start ;;
+  stop) run_service_action stop ;;
+  restart) run_service_action restart ;;
+esac
