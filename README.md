@@ -64,6 +64,7 @@ shiva repair --verify-after network
 shiva repair openvpn
 shiva repair dns
 shiva repair verify dns
+shiva health --json
 shiva doctor config
 shiva doctor state
 shiva doctor release
@@ -108,6 +109,11 @@ Notifications support category cooldowns through `SHIVA_NOTIFY_COOLDOWN_SECONDS`
 
 If a host does not run OpenVPN, set `CHECK_OPENVPN=false` in that host profile
 so watchdog and health checks do not report `OPENVPN NOT INSTALLED`.
+
+`shiva health --json` is the first hardening step toward a shared Health
+Engine. It exposes the same checks as the terminal health summary in a stable
+machine-readable shape for future dashboard, advisor, cluster, and notification
+integrations.
 
 The watchdog is installed with a systemd unit:
 

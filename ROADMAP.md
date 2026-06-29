@@ -199,6 +199,30 @@ Initial implementation status:
 - the existing `shiva logs` command remains available for system journal
   warnings and errors.
 
+## v1.2.5: Hardening
+
+Main idea:
+
+> Shiva Toolkit should become architecturally stable before adding many more
+> infrastructure features.
+
+Priorities:
+
+- one JSON shape for command output;
+- one exit-code policy across commands;
+- unified configuration and profile conventions;
+- clearer `--help` output and README documentation;
+- a shared Health Engine used by Health, Dashboard, Advisor, History, Cluster,
+  and Notify.
+
+Initial implementation status:
+
+- `lib/shiva/health-engine.sh` provides the first shared health collection
+  layer;
+- `shiva health --json` exposes health checks, summary counters, overall
+  status, hostname, and profile from that shared engine;
+- the existing human-readable `shiva health` output remains compatible.
+
 ## v1.3: Server Farm
 
 Main idea:
@@ -222,11 +246,16 @@ llm           Offline
 
 Potential node types:
 
-- main home server;
-- VPN server;
-- speech recognition laptop;
-- future LLM server;
-- home nodes.
+- `shiva-server`: main home server; disk, SMART, temperature, network,
+  OpenVPN client, backups, and system services;
+- `shiva-vpn`: VPN server in Germany; OpenVPN server, ocserv, Amnezia, ports,
+  internet, load, and certificates;
+- `ananda`: Ananda AI; Gunicorn, Web API, database, memory, logs, and service
+  state;
+- `whisper`: speech recognition server; processing queue, CPU, memory,
+  service state, and temperature;
+- `llm`: future local language model server; CPU/GPU usage, memory, model
+  state, and Docker if used.
 
 Acceptance criteria:
 

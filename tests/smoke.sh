@@ -26,6 +26,9 @@ grep -q 'nodes    Show configured node inventory' <<<"$help_output"
 grep -q 'cluster  Show compact infrastructure overview' <<<"$help_output"
 grep -q 'log      Show module logs' <<<"$help_output"
 NO_COLOR=1 "$PROJECT_DIR/bin/shiva-doctor" >/dev/null || [[ $? -eq 2 ]]
+health_json_output="$(NO_COLOR=1 "$PROJECT_DIR/bin/shiva-health" --json || true)"
+grep -q '"checks":\[' <<<"$health_json_output"
+grep -q '"health_percent":' <<<"$health_json_output"
 NO_COLOR=1 SHIVA_STATE_DIR="$stage/state" \
   SHIVA_HISTORY_FILE="$stage/state/history.log" \
   SHIVA_WATCHDOG_STATE_FILE="$stage/state/watchdog.state" \
@@ -50,6 +53,7 @@ install_output="$(DESTDIR="$stage" "$PROJECT_DIR/install.sh")"
 grep -q 'Shiva Toolkit v1.1.0-dev Automation Preview installed' <<<"$install_output"
 test -x "$stage/usr/local/bin/shiva"
 test -r "$stage/usr/local/lib/shiva/common.sh"
+test -r "$stage/usr/local/lib/shiva/health-engine.sh"
 test -r "$stage/usr/local/lib/shiva/profiles/shiva-server.conf"
 grep -q '^CHECK_DOCKER=false$' \
   "$stage/usr/local/lib/shiva/profiles/shiva-server.conf"

@@ -40,6 +40,11 @@ grep -q 'Total: 5' <<<"$history_summary"
 grep -q 'By level' <<<"$history_summary"
 grep -q 'watchdog' <<<"$history_summary"
 
+health_json_output="$(NO_COLOR=1 "$PROJECT_DIR/bin/shiva-health" --json || true)"
+grep -q '"overall":' <<<"$health_json_output"
+grep -q '"checks":\[' <<<"$health_json_output"
+grep -q '"key":"dns"' <<<"$health_json_output"
+
 log_watchdog_output="$(
   NO_COLOR=1 SHIVA_HISTORY_FILE="$history_file" \
     "$PROJECT_DIR/bin/shiva-log" watchdog 10

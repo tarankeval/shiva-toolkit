@@ -229,6 +229,7 @@ show_release_diagnostics() {
   check_release_file "Debian control" "debian/control"
   check_release_file "Build script" "packaging/build-deb.sh"
   check_release_file "Installer" "install.sh"
+  check_release_file "Health engine" "lib/shiva/health-engine.sh"
   check_release_file "Systemd unit" "packaging/systemd/shiva-watchdog.service"
   check_release_file "Smoke tests" "tests/smoke.sh"
   check_release_file "Automation tests" "tests/automation.sh"

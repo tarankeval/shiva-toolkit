@@ -331,3 +331,8 @@ shiva_dns_ok() {
 shiva_gateway_ok() {
   ip route show default 2>/dev/null | grep -q '^default'
 }
+
+shiva_common_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -r "$shiva_common_dir/health-engine.sh" ]]; then
+  source "$shiva_common_dir/health-engine.sh"
+fi
