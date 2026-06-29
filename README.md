@@ -60,6 +60,7 @@ shiva watchdog --once
 shiva watchdog --status
 shiva history
 shiva history --module watchdog
+shiva history --level fail
 shiva notify status
 shiva notify --dry-run "test message"
 ```

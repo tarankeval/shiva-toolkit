@@ -23,6 +23,13 @@ grep -q 'all checks passed' <<<"$history_output"
 grep -q '2 failure(s) detected' <<<"$history_output"
 ! grep -q 'network repair planned' <<<"$history_output"
 
+history_fail_output="$(
+  NO_COLOR=1 SHIVA_HISTORY_FILE="$history_file" \
+    "$PROJECT_DIR/bin/shiva-history" --level fail 10
+)"
+grep -q '2 failure(s) detected' <<<"$history_fail_output"
+! grep -q 'all checks passed' <<<"$history_fail_output"
+
 repair_history="$stage/repair-history.log"
 repair_output="$(
   NO_COLOR=1 SHIVA_HISTORY_FILE="$repair_history" SHIVA_REPAIR_INTERFACE=lo \

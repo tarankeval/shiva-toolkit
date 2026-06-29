@@ -6,10 +6,11 @@ shiva_load_common
 
 limit=50
 module_filter=""
+level_filter=""
 
 usage() {
   cat <<'EOF'
-Usage: shiva history [--module name] [lines]
+Usage: shiva history [--module name] [--level level] [lines]
 
 Show recent Shiva Toolkit operational history.
 EOF
@@ -32,6 +33,17 @@ while (($#)); do
   --module=*)
     module_filter="${1#--module=}"
     ;;
+  --level)
+    shift
+    if [[ -z "${1:-}" ]]; then
+      printf 'Missing level after --level.\n' >&2
+      exit 1
+    fi
+    level_filter="$1"
+    ;;
+  --level=*)
+    level_filter="${1#--level=}"
+    ;;
   *)
     limit="$1"
     ;;
@@ -52,8 +64,9 @@ if [[ ! -r "$SHIVA_HISTORY_FILE" ]]; then
   exit 0
 fi
 
-awk -F '\t' -v module_filter="$module_filter" '
-    module_filter == "" || $3 == module_filter { print }
+awk -F '\t' -v module_filter="$module_filter" -v level_filter="$level_filter" '
+    (module_filter == "" || $3 == module_filter) &&
+    (level_filter == "" || $2 == level_filter) { print }
   ' "$SHIVA_HISTORY_FILE" |
   tail -n "$limit" |
   awk -F '\t' '
