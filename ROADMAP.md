@@ -263,6 +263,15 @@ Acceptance criteria:
 - unhealthy areas are visible immediately;
 - the system remains scriptable and simple to install.
 
+Initial implementation status:
+
+- `shiva cluster` shows a compact infrastructure overview from local
+  dashboard, node inventory, watchdog state, service state, advisor count, and
+  notification state;
+- `shiva cluster --json` exposes the same overview for future dashboard and
+  notification integrations;
+- remote node health is intentionally not scanned yet.
+
 ## Cross-Version Feature: Shiva Advisor
 
 Main idea:
