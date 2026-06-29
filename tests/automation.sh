@@ -38,6 +38,14 @@ grep -q 'Total: 3' <<<"$history_summary"
 grep -q 'By level' <<<"$history_summary"
 grep -q 'watchdog' <<<"$history_summary"
 
+advisor_output="$(
+  NO_COLOR=1 SHIVA_HISTORY_FILE="$history_file" \
+    SHIVA_WATCHDOG_STATE_FILE="$state_file" \
+    "$PROJECT_DIR/bin/shiva-advisor" 10
+)"
+grep -q 'Recommendations' <<<"$advisor_output"
+grep -q 'shiva history --level fail' <<<"$advisor_output"
+
 repair_history="$stage/repair-history.log"
 repair_output="$(
   NO_COLOR=1 SHIVA_HISTORY_FILE="$repair_history" SHIVA_REPAIR_INTERFACE=lo \

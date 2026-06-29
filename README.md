@@ -39,6 +39,7 @@ shiva-doctor      Toolkit and host diagnostics
 shiva-repair      Guided dry-run or applied repairs
 shiva-watchdog    Automation checks for service supervision
 shiva-history     Local operational history
+shiva-advisor     Operational recommendations
 shiva-notify      Configured notifications
 shiva-logs        Recent warning/error logs
 shiva-backup      Backup freshness check
@@ -64,6 +65,7 @@ shiva history
 shiva history --summary
 shiva history --module watchdog
 shiva history --level fail
+shiva advisor
 shiva notify status
 shiva notify --dry-run "test message"
 ```

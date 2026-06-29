@@ -1,0 +1,92 @@
+#!/usr/bin/env bash
+set -u
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../lib/shiva/bootstrap.sh" 2>/dev/null || source /usr/local/lib/shiva/bootstrap.sh
+shiva_load_common
+
+limit=100
+
+usage() {
+  cat <<'EOF'
+Usage: shiva advisor [lines]
+
+Show deterministic recommendations based on Shiva configuration and history.
+EOF
+}
+
+case "${1:-}" in
+  -h|--help|help) usage; exit 0 ;;
+  "") ;;
+  *)
+    limit="$1"
+    ;;
+esac
+
+if [[ ! "$limit" =~ ^[0-9]+$ ]]; then
+  printf 'Advisor history line count must be a number.\n' >&2
+  exit 1
+fi
+
+recommendations=0
+
+recommend() {
+  local message="$1"
+  printf '%s\n' "- $message"
+  ((recommendations+=1))
+}
+
+history_count() {
+  local level="$1"
+  [[ -r "$SHIVA_HISTORY_FILE" ]] || { printf '0'; return 0; }
+  tail -n "$limit" "$SHIVA_HISTORY_FILE" |
+    awk -F '\t' -v level="$level" '$2 == level {count += 1} END {print count + 0}'
+}
+
+watchdog_state() {
+  [[ -r "$SHIVA_WATCHDOG_STATE_FILE" ]] || return 1
+  cat "$SHIVA_WATCHDOG_STATE_FILE"
+}
+
+shiva_title "SHIVA ADVISOR v$SHIVA_VERSION"
+
+fail_count="$(history_count fail)"
+warn_count="$(history_count warn)"
+state="$(watchdog_state || true)"
+
+printf 'History window: last %s event(s)\n' "$limit"
+printf 'Failures: %s\n' "$fail_count"
+printf 'Warnings: %s\n' "$warn_count"
+[[ -n "$state" ]] && printf 'Watchdog state: %s\n' "$state"
+printf '\nRecommendations\n'
+
+if (( fail_count > 0 )); then
+  recommend "Review recent failures with: shiva history --level fail"
+fi
+
+if (( warn_count > 0 )); then
+  recommend "Review warnings with: shiva history --level warn"
+fi
+
+case "$state" in
+  fail:*)
+    recommend "Inspect watchdog state with: shiva watchdog --status"
+    recommend "Verify affected repair targets before applying changes"
+    ;;
+  "")
+    recommend "Run one watchdog cycle with: shiva watchdog --once"
+    ;;
+esac
+
+if ! shiva_enabled "$SHIVA_TELEGRAM_ENABLED"; then
+  recommend "Configure Telegram notifications before relying on unattended watchdog alerts"
+elif [[ -z "$SHIVA_TELEGRAM_BOT_TOKEN" || -z "$SHIVA_TELEGRAM_CHAT_ID" ]]; then
+  recommend "Complete Telegram token and chat ID configuration"
+fi
+
+if ! shiva_enabled "$SHIVA_WATCHDOG_AUTO_REPAIR"; then
+  recommend "Keep auto-repair disabled until repair targets are verified on this host"
+fi
+
+if (( recommendations == 0 )); then
+  printf 'No immediate recommendations.\n'
+fi
