@@ -4,17 +4,40 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../lib/shiva/bootstrap.sh" 2>/dev/null || source /usr/local/lib/shiva/bootstrap.sh
 shiva_load_common
 
-limit="${1:-50}"
-case "$limit" in
-  -h|--help|help)
-    cat <<'EOF'
-Usage: shiva history [lines]
+limit=50
+module_filter=""
+
+usage() {
+  cat <<'EOF'
+Usage: shiva history [--module name] [lines]
 
 Show recent Shiva Toolkit operational history.
 EOF
+}
+
+while (($#)); do
+  case "$1" in
+  -h|--help|help)
+    usage
     exit 0
     ;;
-esac
+  --module)
+    shift
+    if [[ -z "${1:-}" ]]; then
+      printf 'Missing module name after --module.\n' >&2
+      exit 1
+    fi
+    module_filter="$1"
+    ;;
+  --module=*)
+    module_filter="${1#--module=}"
+    ;;
+  *)
+    limit="$1"
+    ;;
+  esac
+  shift
+done
 
 if [[ ! "$limit" =~ ^[0-9]+$ ]]; then
   printf 'History line count must be a number.\n' >&2
@@ -29,7 +52,10 @@ if [[ ! -r "$SHIVA_HISTORY_FILE" ]]; then
   exit 0
 fi
 
-tail -n "$limit" "$SHIVA_HISTORY_FILE" |
+awk -F '\t' -v module_filter="$module_filter" '
+    module_filter == "" || $3 == module_filter { print }
+  ' "$SHIVA_HISTORY_FILE" |
+  tail -n "$limit" |
   awk -F '\t' '
     {
       split($1, parts, "T")

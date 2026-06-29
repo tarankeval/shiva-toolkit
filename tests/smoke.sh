@@ -24,6 +24,7 @@ NO_COLOR=1 "$PROJECT_DIR/bin/shiva-repair" --help >/dev/null
 NO_COLOR=1 "$PROJECT_DIR/bin/shiva-watchdog" --help >/dev/null
 bash "$PROJECT_DIR/tests/health-vpn.sh"
 bash "$PROJECT_DIR/tests/profiles.sh"
+bash "$PROJECT_DIR/tests/automation.sh"
 
 install_output="$(DESTDIR="$stage" "$PROJECT_DIR/install.sh")"
 grep -q 'Shiva Toolkit v1.1.0-dev Automation Preview installed' <<<"$install_output"

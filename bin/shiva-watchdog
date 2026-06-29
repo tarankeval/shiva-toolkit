@@ -5,23 +5,48 @@ source "$SCRIPT_DIR/../lib/shiva/bootstrap.sh" 2>/dev/null || source /usr/local/
 shiva_load_common
 
 once=false
+status_only=false
 
 usage() {
   cat <<'EOF'
-Usage: shiva watchdog [--once]
+Usage: shiva watchdog [--once] [--status]
 
 Run Shiva Toolkit watchdog checks. Use --once for a single check cycle.
+Use --status to show the last recorded watchdog state without running checks.
 EOF
 }
 
 while (($#)); do
   case "$1" in
     --once) once=true ;;
+    --status) status_only=true ;;
     -h|--help|help) usage; exit 0 ;;
     *) printf 'Unknown watchdog option: %s\n' "$1" >&2; usage >&2; exit 1 ;;
   esac
   shift
 done
+
+show_status() {
+  shiva_title "SHIVA WATCHDOG STATUS v$SHIVA_VERSION"
+  if [[ ! -r "$SHIVA_WATCHDOG_STATE_FILE" ]]; then
+    shiva_status warn "State" "NO DATA"
+    printf '\nState file: %s\n' "$SHIVA_WATCHDOG_STATE_FILE"
+    return 1
+  fi
+
+  local state
+  state="$(<"$SHIVA_WATCHDOG_STATE_FILE")"
+  case "$state" in
+    ok) shiva_status ok "State" "OK"; return 0 ;;
+    fail:*) shiva_status fail "State" "${state#fail:} failure(s)"; return 2 ;;
+    *) shiva_status warn "State" "$state"; return 1 ;;
+  esac
+}
+
+if [[ "$status_only" == true ]]; then
+  show_status
+  exit $?
+fi
 
 watchdog_cycle() {
   local failures=0 state root_percent raw_temp interface previous_state current_state

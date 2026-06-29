@@ -55,7 +55,9 @@ shiva repair network
 shiva repair openvpn
 shiva repair dns
 shiva watchdog --once
+shiva watchdog --status
 shiva history
+shiva history --module watchdog
 ```
 
 `shiva repair` runs in dry-run mode by default and prints planned actions.
