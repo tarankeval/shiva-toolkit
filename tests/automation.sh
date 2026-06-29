@@ -159,6 +159,20 @@ doctor_state_json="$(
 grep -q '"issues":0' <<<"$doctor_state_json"
 grep -q '"files":\[' <<<"$doctor_state_json"
 
+doctor_config_output="$(
+  NO_COLOR=1 SHIVA_NODES="local:server:localhost" \
+    "$PROJECT_DIR/bin/shiva-doctor" config || true
+)"
+grep -q 'SHIVA DOCTOR CONFIG' <<<"$doctor_config_output"
+grep -q 'Profile' <<<"$doctor_config_output"
+
+doctor_config_json="$(
+  NO_COLOR=1 SHIVA_NODES="local:server:localhost" \
+    "$PROJECT_DIR/bin/shiva-doctor" config --json || true
+)"
+grep -q '"profile":' <<<"$doctor_config_json"
+grep -q '"nodes":1' <<<"$doctor_config_json"
+
 service_plan="$(
   NO_COLOR=1 "$PROJECT_DIR/bin/shiva-service" enable
 )"

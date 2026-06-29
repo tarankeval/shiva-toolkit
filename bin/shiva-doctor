@@ -5,7 +5,7 @@ source "$SCRIPT_DIR/../lib/shiva/bootstrap.sh" 2>/dev/null || source /usr/local/
 shiva_load_common
 
 show_state_diagnostics() {
-  local issues=0 path dir tmp_file seen_paths="" json=false first=true
+  local issues=0 path dir tmp_file seen_paths="" json=false first=true status
   if [[ "${1:-}" == "--json" ]]; then
     json=true
   fi
@@ -83,13 +83,98 @@ show_state_diagnostics() {
   return 0
 }
 
+json_escape() {
+  local value="$1"
+  value="${value//\\/\\\\}"
+  value="${value//\"/\\\"}"
+  value="${value//$'\n'/\\n}"
+  value="${value//$'\t'/\\t}"
+  printf '%s' "$value"
+}
+
+show_config_diagnostics() {
+  local json=false issues=0 nodes_count=0 entry openvpn_enabled docker_enabled
+  if [[ "${1:-}" == "--json" ]]; then
+    json=true
+  fi
+
+  for entry in $SHIVA_NODES; do
+    [[ -n "$entry" ]] && ((nodes_count+=1))
+  done
+
+  shiva_check_enabled CHECK_OPENVPN || openvpn_enabled=false
+  shiva_check_enabled CHECK_OPENVPN && openvpn_enabled=true
+  shiva_check_enabled CHECK_DOCKER || docker_enabled=false
+  shiva_check_enabled CHECK_DOCKER && docker_enabled=true
+
+  if shiva_enabled "$SHIVA_TELEGRAM_ENABLED" &&
+    [[ -z "$SHIVA_TELEGRAM_BOT_TOKEN" || -z "$SHIVA_TELEGRAM_CHAT_ID" ]]; then
+    ((issues+=1))
+  fi
+  if shiva_enabled "$SHIVA_WATCHDOG_AUTO_REPAIR" && [[ -z "$SHIVA_WATCHDOG_REPAIR_TARGETS" ]]; then
+    ((issues+=1))
+  fi
+  if [[ "$nodes_count" -eq 0 ]]; then
+    ((issues+=1))
+  fi
+
+  if [[ "$json" == true ]]; then
+    printf '{'
+    printf '"hostname":"%s",' "$(json_escape "$SHIVA_HOSTNAME")"
+    printf '"profile":"%s",' "$(json_escape "$SHIVA_PROFILE_NAME")"
+    printf '"profile_source":"%s",' "$(json_escape "$SHIVA_PROFILE_SOURCE")"
+    printf '"check_openvpn":%s,' "$openvpn_enabled"
+    printf '"check_docker":%s,' "$docker_enabled"
+    printf '"watchdog_interval":%s,' "$SHIVA_WATCHDOG_INTERVAL"
+    printf '"watchdog_auto_repair":%s,' "$(shiva_enabled "$SHIVA_WATCHDOG_AUTO_REPAIR" && printf true || printf false)"
+    printf '"watchdog_repair_targets":"%s",' "$(json_escape "$SHIVA_WATCHDOG_REPAIR_TARGETS")"
+    printf '"telegram_enabled":%s,' "$(shiva_enabled "$SHIVA_TELEGRAM_ENABLED" && printf true || printf false)"
+    printf '"nodes":%s,' "$nodes_count"
+    printf '"issues":%s' "$issues"
+    printf '}\n'
+    (( issues == 0 ))
+    return
+  fi
+
+  shiva_title "SHIVA DOCTOR CONFIG"
+  shiva_status ok "Hostname" "$SHIVA_HOSTNAME"
+  shiva_status ok "Profile" "$SHIVA_PROFILE_NAME"
+  shiva_status ok "Profile source" "$SHIVA_PROFILE_SOURCE"
+  shiva_status ok "OpenVPN check" "$openvpn_enabled"
+  shiva_status ok "Docker check" "$docker_enabled"
+  shiva_status ok "Watchdog interval" "${SHIVA_WATCHDOG_INTERVAL}s"
+  if shiva_enabled "$SHIVA_WATCHDOG_AUTO_REPAIR"; then
+    shiva_status warn "Auto repair" "ENABLED"
+  else
+    shiva_status ok "Auto repair" "DISABLED"
+  fi
+  shiva_status ok "Repair targets" "${SHIVA_WATCHDOG_REPAIR_TARGETS:-none}"
+  if shiva_enabled "$SHIVA_TELEGRAM_ENABLED"; then
+    if [[ -n "$SHIVA_TELEGRAM_BOT_TOKEN" && -n "$SHIVA_TELEGRAM_CHAT_ID" ]]; then
+      shiva_status ok "Telegram" "ENABLED"
+    else
+      shiva_status fail "Telegram" "ENABLED BUT INCOMPLETE"
+    fi
+  else
+    shiva_status warn "Telegram" "DISABLED"
+  fi
+  if (( nodes_count > 0 )); then
+    shiva_status ok "Nodes" "$nodes_count"
+  else
+    shiva_status warn "Nodes" "NONE"
+  fi
+
+  (( issues == 0 ))
+}
+
 case "${1:-}" in
   state) shift; show_state_diagnostics "${1:-}"; exit $? ;;
+  config) shift; show_config_diagnostics "${1:-}"; exit $? ;;
   -h|--help|help)
     cat <<'EOF'
-Usage: shiva doctor [state]
+Usage: shiva doctor [state|config]
 
-Diagnose toolkit dependencies, host setup, and optional state paths.
+Diagnose toolkit dependencies, host setup, state paths, and configuration.
 EOF
     exit 0
     ;;
