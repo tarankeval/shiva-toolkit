@@ -64,6 +64,14 @@ recommendation_count() {
     '
 }
 
+node_count() {
+  local count=0 entry
+  for entry in $SHIVA_NODES; do
+    [[ -n "$entry" ]] && ((count+=1))
+  done
+  printf '%s' "$count"
+}
+
 json_escape() {
   local value="$1"
   value="${value//\\/\\\\}"
@@ -80,6 +88,7 @@ warn_count="$(history_count warn)"
 info_count="$(history_count info)"
 advisor_count="$(recommendation_count)"
 [[ -n "$advisor_count" ]] || advisor_count=0
+nodes="$(node_count)"
 
 if [[ "$json" == true ]]; then
   printf '{'
@@ -88,6 +97,7 @@ if [[ "$json" == true ]]; then
   printf '"failures":%s,' "$fail_count"
   printf '"warnings":%s,' "$warn_count"
   printf '"info_events":%s,' "$info_count"
+  printf '"nodes":%s,' "$nodes"
   printf '"advisor_recommendations":%s,' "$advisor_count"
   if shiva_enabled "$SHIVA_TELEGRAM_ENABLED"; then
     printf '"telegram":"enabled"'
@@ -125,6 +135,7 @@ else
   shiva_status ok "Warnings" "$warn_count"
 fi
 shiva_status ok "Info events" "$info_count"
+shiva_status ok "Nodes" "$nodes"
 
 if (( advisor_count > 0 )); then
   shiva_status warn "Advisor" "$advisor_count recommendation(s)"

@@ -53,6 +53,10 @@ SHIVA_TELEGRAM_ENABLED=false
 SHIVA_TELEGRAM_BOT_TOKEN=""
 SHIVA_TELEGRAM_CHAT_ID=""
 
+# Node inventory for future farm/cluster views.
+# Format: name:role:host, separated by spaces.
+SHIVA_NODES="local:local:localhost"
+
 # Backup freshness check.
 SHIVA_BACKUP_DIR="/var/backups"
 SHIVA_BACKUP_MAX_AGE_HOURS=48

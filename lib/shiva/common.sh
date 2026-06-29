@@ -50,6 +50,7 @@ fi
 : "${SHIVA_TELEGRAM_ENABLED:=false}"
 : "${SHIVA_TELEGRAM_BOT_TOKEN:=}"
 : "${SHIVA_TELEGRAM_CHAT_ID:=}"
+: "${SHIVA_NODES:=}"
 
 shiva_detect_hostname() {
   local detected
@@ -84,6 +85,8 @@ shiva_load_profile() {
 }
 
 shiva_load_profile
+
+: "${SHIVA_NODES:=local:local:$SHIVA_HOSTNAME}"
 
 # Backward-compatible singular form for profiles that require one interface.
 if [[ -z "$REQUIRED_INTERFACES" && -n "$REQUIRED_INTERFACE" ]]; then

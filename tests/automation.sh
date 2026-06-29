@@ -64,21 +64,25 @@ grep -q 'notification skipped: telegram disabled' "$history_file"
 
 dashboard_output="$(
   NO_COLOR=1 SHIVA_HISTORY_FILE="$history_file" \
+    SHIVA_NODES="local:server:localhost vpn:VPN:shiva-vpn" \
     SHIVA_WATCHDOG_STATE_FILE="$state_file" \
     "$PROJECT_DIR/bin/shiva-dashboard" 10
 )"
 grep -q 'SHIVA DASHBOARD' <<<"$dashboard_output"
 grep -q 'Watchdog' <<<"$dashboard_output"
 grep -q 'Service' <<<"$dashboard_output"
+grep -q 'Nodes' <<<"$dashboard_output"
 grep -q 'Recent failures' <<<"$dashboard_output"
 
 dashboard_json="$(
   NO_COLOR=1 SHIVA_HISTORY_FILE="$history_file" \
+    SHIVA_NODES="local:server:localhost vpn:VPN:shiva-vpn" \
     SHIVA_WATCHDOG_STATE_FILE="$state_file" \
     "$PROJECT_DIR/bin/shiva-dashboard" --json 10
 )"
 grep -q '"failures":1' <<<"$dashboard_json"
 grep -q '"service":' <<<"$dashboard_json"
+grep -q '"nodes":2' <<<"$dashboard_json"
 grep -q '"telegram":"disabled"' <<<"$dashboard_json"
 
 repair_history="$stage/repair-history.log"
@@ -129,6 +133,20 @@ service_plan="$(
   NO_COLOR=1 "$PROJECT_DIR/bin/shiva-service" enable
 )"
 grep -q 'PLAN systemctl enable shiva-watchdog' <<<"$service_plan"
+
+nodes_output="$(
+  NO_COLOR=1 SHIVA_NODES="local:server:localhost vpn:VPN:shiva-vpn" \
+    "$PROJECT_DIR/bin/shiva-nodes"
+)"
+grep -q 'local' <<<"$nodes_output"
+grep -q 'vpn' <<<"$nodes_output"
+
+nodes_json="$(
+  NO_COLOR=1 SHIVA_NODES="local:server:localhost vpn:VPN:shiva-vpn" \
+    "$PROJECT_DIR/bin/shiva-nodes" --json
+)"
+grep -q '"nodes":\[' <<<"$nodes_json"
+grep -q '"name":"vpn"' <<<"$nodes_json"
 
 printf 'ok\n' >"$state_file"
 NO_COLOR=1 SHIVA_WATCHDOG_STATE_FILE="$state_file" \

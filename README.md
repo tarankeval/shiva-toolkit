@@ -43,6 +43,7 @@ shiva-advisor     Operational recommendations
 shiva-dashboard   Compact operational dashboard
 shiva-notify      Configured notifications
 shiva-service     Manage Shiva systemd services
+shiva-nodes       Configured node inventory
 shiva-logs        Recent warning/error logs
 shiva-backup      Backup freshness check
 ```
@@ -77,6 +78,8 @@ shiva notify status
 shiva notify --dry-run "test message"
 shiva service status
 shiva service --apply enable
+shiva nodes
+shiva nodes --json
 ```
 
 `shiva repair` runs in dry-run mode by default and prints planned actions.

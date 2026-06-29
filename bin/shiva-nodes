@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+set -u
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../lib/shiva/bootstrap.sh" 2>/dev/null || source /usr/local/lib/shiva/bootstrap.sh
+shiva_load_common
+
+json=false
+
+usage() {
+  cat <<'EOF'
+Usage: shiva nodes [--json]
+
+Show configured Shiva node inventory. This command does not scan the network.
+EOF
+}
+
+while (($#)); do
+  case "$1" in
+    --json) json=true ;;
+    -h|--help|help) usage; exit 0 ;;
+    *) printf 'Unknown nodes option: %s\n' "$1" >&2; usage >&2; exit 1 ;;
+  esac
+  shift
+done
+
+json_escape() {
+  local value="$1"
+  value="${value//\\/\\\\}"
+  value="${value//\"/\\\"}"
+  value="${value//$'\n'/\\n}"
+  value="${value//$'\t'/\\t}"
+  printf '%s' "$value"
+}
+
+node_status() {
+  local host="$1"
+  if [[ "$host" == "$SHIVA_HOSTNAME" || "$host" == "localhost" || "$host" == "127.0.0.1" ]]; then
+    printf 'local'
+  else
+    printf 'configured'
+  fi
+}
+
+if [[ "$json" == true ]]; then
+  printf '{"nodes":['
+  separator=""
+  for entry in $SHIVA_NODES; do
+    IFS=':' read -r name role host extra <<<"$entry"
+    [[ -n "${name:-}" ]] || continue
+    [[ -n "${role:-}" ]] || role="unknown"
+    [[ -n "${host:-}" ]] || host="$name"
+    status="$(node_status "$host")"
+    printf '%s{"name":"%s","role":"%s","host":"%s","status":"%s"}' \
+      "$separator" "$(json_escape "$name")" "$(json_escape "$role")" \
+      "$(json_escape "$host")" "$(json_escape "$status")"
+    separator=","
+  done
+  printf ']}\n'
+  exit 0
+fi
+
+shiva_title "SHIVA NODES v$SHIVA_VERSION"
+for entry in $SHIVA_NODES; do
+  IFS=':' read -r name role host extra <<<"$entry"
+  [[ -n "${name:-}" ]] || continue
+  [[ -n "${role:-}" ]] || role="unknown"
+  [[ -n "${host:-}" ]] || host="$name"
+  status="$(node_status "$host")"
+  case "$status" in
+    local) shiva_status ok "$name" "$role ($host, local)" ;;
+    *) shiva_status warn "$name" "$role ($host, configured)" ;;
+  esac
+done
