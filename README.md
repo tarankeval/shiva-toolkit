@@ -65,6 +65,9 @@ shiva history --module watchdog
 Use `--apply` only when the target profile is configured and the command is
 running with the required permissions.
 
+When `SHIVA_WATCHDOG_AUTO_REPAIR=true`, watchdog maps failures to repair
+targets and only runs targets allowed by `SHIVA_WATCHDOG_REPAIR_TARGETS`.
+
 The watchdog is installed with a systemd unit:
 
 ```bash

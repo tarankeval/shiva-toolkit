@@ -34,11 +34,21 @@ show_status() {
     return 1
   fi
 
-  local state
+  local state count targets
   state="$(<"$SHIVA_WATCHDOG_STATE_FILE")"
   case "$state" in
     ok) shiva_status ok "State" "OK"; return 0 ;;
-    fail:*) shiva_status fail "State" "${state#fail:} failure(s)"; return 2 ;;
+    fail:*)
+      count="${state#fail:}"
+      targets=""
+      if [[ "$count" == *:* ]]; then
+        targets="${count#*:}"
+        count="${count%%:*}"
+      fi
+      shiva_status fail "State" "$count failure(s)"
+      [[ -n "$targets" ]] && shiva_status warn "Repair targets" "$targets"
+      return 2
+      ;;
     *) shiva_status warn "State" "$state"; return 1 ;;
   esac
 }
@@ -48,27 +58,63 @@ if [[ "$status_only" == true ]]; then
   exit $?
 fi
 
+add_repair_target() {
+  local target="$1" existing
+  for existing in "${repair_targets[@]:-}"; do
+    [[ "$existing" == "$target" ]] && return 0
+  done
+  repair_targets+=("$target")
+}
+
+repair_target_allowed() {
+  local target="$1" allowed
+  for allowed in $SHIVA_WATCHDOG_REPAIR_TARGETS; do
+    [[ "$allowed" == "$target" ]] && return 0
+  done
+  return 1
+}
+
+repair_target_string() {
+  local target separator=""
+  for target in "${repair_targets[@]:-}"; do
+    printf '%s%s' "$separator" "$target"
+    separator=","
+  done
+}
+
+run_auto_repairs() {
+  local target
+  for target in "${repair_targets[@]:-}"; do
+    if repair_target_allowed "$target"; then
+      "$SCRIPT_DIR/shiva-repair" --apply "$target" || true
+    else
+      shiva_history_add watchdog info "auto-repair skipped for $target: not allowed"
+    fi
+  done
+}
+
 watchdog_cycle() {
-  local failures=0 state root_percent raw_temp interface previous_state current_state
+  local failures=0 state root_percent raw_temp interface previous_state current_state targets
+  local -a repair_targets=()
 
   shiva_gateway_ok &&
     shiva_status ok "Gateway" "OK" ||
-    { shiva_status fail "Gateway" "FAILED"; ((failures+=1)); }
+    { shiva_status fail "Gateway" "FAILED"; ((failures+=1)); add_repair_target network; }
 
   shiva_connectivity_ok &&
     shiva_status ok "Internet" "OK" ||
-    { shiva_status fail "Internet" "FAILED"; ((failures+=1)); }
+    { shiva_status fail "Internet" "FAILED"; ((failures+=1)); add_repair_target network; }
 
   shiva_dns_ok &&
     shiva_status ok "DNS" "OK" ||
-    { shiva_status fail "DNS" "FAILED"; ((failures+=1)); }
+    { shiva_status fail "DNS" "FAILED"; ((failures+=1)); add_repair_target dns; }
 
   if shiva_check_enabled CHECK_INTERFACES; then
     if [[ -n "$REQUIRED_INTERFACES" ]]; then
       for interface in $REQUIRED_INTERFACES; do
         shiva_required_interface_healthy "$interface" &&
           shiva_status ok "Interface $interface" "UP" ||
-          { shiva_status fail "Interface $interface" "DOWN OR MISSING"; ((failures+=1)); }
+          { shiva_status fail "Interface $interface" "DOWN OR MISSING"; ((failures+=1)); add_repair_target network; }
       done
     fi
   fi
@@ -80,6 +126,7 @@ watchdog_cycle() {
     else
       shiva_status fail "OPENVPN" "$state"
       ((failures+=1))
+      add_repair_target openvpn
     fi
   fi
 
@@ -110,14 +157,20 @@ watchdog_cycle() {
     previous_state="$(<"$SHIVA_WATCHDOG_STATE_FILE")"
 
   if (( failures > 0 )); then
+    targets="$(repair_target_string)"
     current_state="fail:$failures"
-    if [[ "$previous_state" != fail:* ]]; then
-      shiva_history_add watchdog fail "$failures failure(s) detected"
+    [[ -n "$targets" ]] && current_state+=":$targets"
+    if [[ "$previous_state" != "$current_state" ]]; then
+      if [[ -n "$targets" ]]; then
+        shiva_history_add watchdog fail "$failures failure(s) detected; repair targets: $targets"
+      else
+        shiva_history_add watchdog fail "$failures failure(s) detected"
+      fi
     fi
     mkdir -p "$(dirname -- "$SHIVA_WATCHDOG_STATE_FILE")" 2>/dev/null || true
     printf '%s\n' "$current_state" >"$SHIVA_WATCHDOG_STATE_FILE" 2>/dev/null || true
-    if [[ "$previous_state" != fail:* ]] && shiva_enabled "$SHIVA_WATCHDOG_AUTO_REPAIR"; then
-      "$SCRIPT_DIR/shiva-repair" --apply network || true
+    if [[ "$previous_state" != "$current_state" ]] && shiva_enabled "$SHIVA_WATCHDOG_AUTO_REPAIR"; then
+      run_auto_repairs
     fi
     return 2
   fi

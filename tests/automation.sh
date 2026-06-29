@@ -53,4 +53,12 @@ else
   [[ "$rc" -eq 2 ]]
 fi
 
+printf 'fail:3:network,dns\n' >"$state_file"
+watchdog_status="$(
+  NO_COLOR=1 SHIVA_WATCHDOG_STATE_FILE="$state_file" \
+    "$PROJECT_DIR/bin/shiva-watchdog" --status || [[ "$?" -eq 2 ]]
+)"
+grep -q '3 failure(s)' <<<"$watchdog_status"
+grep -q 'network,dns' <<<"$watchdog_status"
+
 printf 'Automation tests passed.\n'

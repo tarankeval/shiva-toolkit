@@ -43,6 +43,7 @@ fi
 : "${SHIVA_OPENVPN_SERVICE:=}"
 : "${SHIVA_WATCHDOG_INTERVAL:=60}"
 : "${SHIVA_WATCHDOG_AUTO_REPAIR:=false}"
+: "${SHIVA_WATCHDOG_REPAIR_TARGETS:=network dns openvpn}"
 
 shiva_detect_hostname() {
   local detected
