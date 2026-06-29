@@ -6,13 +6,15 @@ shiva_load_common
 
 once=false
 status_only=false
+config_only=false
 
 usage() {
   cat <<'EOF'
-Usage: shiva watchdog [--once] [--status]
+Usage: shiva watchdog [--once] [--status] [--config]
 
 Run Shiva Toolkit watchdog checks. Use --once for a single check cycle.
 Use --status to show the last recorded watchdog state without running checks.
+Use --config to show watchdog automation settings.
 EOF
 }
 
@@ -20,6 +22,7 @@ while (($#)); do
   case "$1" in
     --once) once=true ;;
     --status) status_only=true ;;
+    --config) config_only=true ;;
     -h|--help|help) usage; exit 0 ;;
     *) printf 'Unknown watchdog option: %s\n' "$1" >&2; usage >&2; exit 1 ;;
   esac
@@ -53,9 +56,32 @@ show_status() {
   esac
 }
 
+show_config() {
+  shiva_title "SHIVA WATCHDOG CONFIG v$SHIVA_VERSION"
+  shiva_status ok "Interval" "${SHIVA_WATCHDOG_INTERVAL}s"
+  if shiva_enabled "$SHIVA_WATCHDOG_AUTO_REPAIR"; then
+    shiva_status warn "Auto repair" "ENABLED"
+  else
+    shiva_status ok "Auto repair" "DISABLED"
+  fi
+  shiva_status ok "Repair targets" "$SHIVA_WATCHDOG_REPAIR_TARGETS"
+  if shiva_enabled "$SHIVA_NOTIFY_ON_WATCHDOG"; then
+    shiva_status ok "Notifications" "ENABLED"
+  else
+    shiva_status warn "Notifications" "DISABLED"
+  fi
+  shiva_status ok "State file" "$SHIVA_WATCHDOG_STATE_FILE"
+  shiva_status ok "History file" "$SHIVA_HISTORY_FILE"
+}
+
 if [[ "$status_only" == true ]]; then
   show_status
   exit $?
+fi
+
+if [[ "$config_only" == true ]]; then
+  show_config
+  exit 0
 fi
 
 add_repair_target() {

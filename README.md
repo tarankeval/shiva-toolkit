@@ -58,6 +58,7 @@ shiva repair openvpn
 shiva repair dns
 shiva watchdog --once
 shiva watchdog --status
+shiva watchdog --config
 shiva history
 shiva history --module watchdog
 shiva history --level fail

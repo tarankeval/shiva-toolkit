@@ -63,6 +63,14 @@ printf 'ok\n' >"$state_file"
 NO_COLOR=1 SHIVA_WATCHDOG_STATE_FILE="$state_file" \
   "$PROJECT_DIR/bin/shiva-watchdog" --status >/dev/null
 
+watchdog_config="$(
+  NO_COLOR=1 SHIVA_WATCHDOG_STATE_FILE="$state_file" \
+    "$PROJECT_DIR/bin/shiva-watchdog" --config
+)"
+grep -q 'Interval' <<<"$watchdog_config"
+grep -q 'Auto repair' <<<"$watchdog_config"
+grep -q 'Repair targets' <<<"$watchdog_config"
+
 printf 'fail:3\n' >"$state_file"
 if NO_COLOR=1 SHIVA_WATCHDOG_STATE_FILE="$state_file" \
   "$PROJECT_DIR/bin/shiva-watchdog" --status >/dev/null; then
