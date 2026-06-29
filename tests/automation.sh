@@ -71,6 +71,15 @@ grep -q 'PLAN bring lo down' <<<"$repair_output"
 grep -q 'PLAN bring lo up' <<<"$repair_output"
 grep -q $'\tinfo\trepair\tnetwork repair planned for lo' "$repair_history"
 
+repair_verify_rc=0
+repair_verify_output="$(
+  NO_COLOR=1 SHIVA_HISTORY_FILE="$repair_history" SHIVA_REPAIR_INTERFACE=lo \
+    "$PROJECT_DIR/bin/shiva-repair" --verify-after network
+)" || repair_verify_rc=$?
+[[ "$repair_verify_rc" -ne 0 ]]
+grep -q 'SHIVA VERIFY NETWORK' <<<"$repair_verify_output"
+grep -Eq $'\t(repair)\t(network verification passed|network verification failed)' "$repair_history"
+
 repair_status="$(
   NO_COLOR=1 SHIVA_REPAIR_INTERFACE=lo "$PROJECT_DIR/bin/shiva-repair" status
 )"

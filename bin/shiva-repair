@@ -6,11 +6,12 @@ shiva_load_common
 
 apply=false
 verify=false
+verify_after=false
 target=""
 
 usage() {
   cat <<'EOF'
-Usage: shiva repair [--apply] <target>
+Usage: shiva repair [--apply] [--verify-after] <target>
        shiva repair verify <target>
 
 Targets:
@@ -27,6 +28,7 @@ EOF
 while (($#)); do
   case "$1" in
     --apply) apply=true ;;
+    --verify-after) verify_after=true ;;
     verify) verify=true ;;
     -h|--help|help) usage; exit 0 ;;
     status|network|openvpn|dns) target="$1" ;;
@@ -101,6 +103,19 @@ verify_target() {
     dns) verify_dns ;;
     *) printf 'Verification is not available for target: %s\n' "$target" >&2; return 1 ;;
   esac
+}
+
+run_verify_after() {
+  local rc
+  printf '\n'
+  if verify_target; then
+    shiva_history_add repair ok "$target verification passed"
+    return 0
+  else
+    rc=$?
+    shiva_history_add repair fail "$target verification failed"
+    return "$rc"
+  fi
 }
 
 repair_status() {
@@ -233,6 +248,12 @@ case "$target" in
       verify_target
     else
       "repair_$target"
+      rc=$?
+      if (( rc == 0 )) && [[ "$verify_after" == true ]]; then
+        run_verify_after
+        rc=$?
+      fi
+      exit "$rc"
     fi
     ;;
 esac

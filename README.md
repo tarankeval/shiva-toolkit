@@ -55,6 +55,7 @@ The `v1.1` development branch introduces the first automation commands:
 ```bash
 shiva repair status
 shiva repair network
+shiva repair --verify-after network
 shiva repair openvpn
 shiva repair dns
 shiva repair verify dns
