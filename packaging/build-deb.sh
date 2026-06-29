@@ -17,6 +17,7 @@ mkdir -p \
   "$PACKAGE_ROOT/usr/share/doc/$PACKAGE_NAME" \
   "$PACKAGE_ROOT/lib/systemd/system" \
   "$PACKAGE_ROOT/etc/shiva/profiles" \
+  "$PACKAGE_ROOT/var/lib/shiva/notify" \
   "$PROJECT_DIR/dist"
 
 install -m 0755 "$PROJECT_DIR"/bin/shiva* "$PACKAGE_ROOT/usr/bin/"

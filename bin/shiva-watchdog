@@ -125,6 +125,13 @@ notify_watchdog() {
   "$SCRIPT_DIR/shiva-notify" --category "watchdog-$level" "[$level] $SHIVA_HOSTNAME: $message" || true
 }
 
+write_watchdog_state() {
+  local state="$1" dir
+  dir="$(dirname -- "$SHIVA_WATCHDOG_STATE_FILE")"
+  mkdir -p "$dir" 2>/dev/null || return 0
+  { printf '%s\n' "$state" >"$SHIVA_WATCHDOG_STATE_FILE"; } 2>/dev/null || return 0
+}
+
 watchdog_cycle() {
   local failures=0 state root_percent raw_temp interface previous_state current_state targets
   local -a repair_targets=()
@@ -174,7 +181,9 @@ watchdog_cycle() {
 
   if shiva_check_enabled CHECK_TEMPERATURE && [[ -r /sys/class/thermal/thermal_zone0/temp ]]; then
     raw_temp="$(< /sys/class/thermal/thermal_zone0/temp)"
-    if (( raw_temp >= 80000 )); then
+    if (( raw_temp <= 0 )); then
+      shiva_status warn "CPU" "UNKNOWN"
+    elif (( raw_temp >= 80000 )); then
       shiva_status fail "CPU" "$((raw_temp / 1000))C"
       ((failures+=1))
     elif (( raw_temp >= 70000 )); then
@@ -201,8 +210,7 @@ watchdog_cycle() {
         notify_watchdog fail "$failures failure(s) detected"
       fi
     fi
-    mkdir -p "$(dirname -- "$SHIVA_WATCHDOG_STATE_FILE")" 2>/dev/null || true
-    printf '%s\n' "$current_state" >"$SHIVA_WATCHDOG_STATE_FILE" 2>/dev/null || true
+    write_watchdog_state "$current_state"
     if [[ "$previous_state" != "$current_state" ]] && shiva_enabled "$SHIVA_WATCHDOG_AUTO_REPAIR"; then
       run_auto_repairs
     fi
@@ -214,8 +222,7 @@ watchdog_cycle() {
     shiva_history_add watchdog ok "all checks passed"
     notify_watchdog ok "all checks passed"
   fi
-  mkdir -p "$(dirname -- "$SHIVA_WATCHDOG_STATE_FILE")" 2>/dev/null || true
-  printf '%s\n' "$current_state" >"$SHIVA_WATCHDOG_STATE_FILE" 2>/dev/null || true
+  write_watchdog_state "$current_state"
   return 0
 }
 

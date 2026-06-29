@@ -49,6 +49,8 @@ test -r "$stage/usr/local/lib/shiva/profiles/shiva-vpn.conf"
 test -r "$stage/usr/local/lib/shiva/profiles/ananda.conf"
 test -d "$stage/etc/shiva/profiles"
 test -r "$stage/etc/shiva/shiva.conf"
+test -d "$stage/var/lib/shiva"
+test -d "$stage/var/lib/shiva/notify"
 test -r "$stage/etc/systemd/system/shiva-watchdog.service"
 grep -q 'ExecStart=/usr/local/bin/shiva-watchdog' \
   "$stage/etc/systemd/system/shiva-watchdog.service"

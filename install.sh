@@ -13,7 +13,8 @@ if (( EUID != 0 )) && [[ -z "$ROOT" ]]; then
 fi
 
 install -d "$ROOT$PREFIX/bin" "$ROOT$PREFIX/lib/shiva/profiles" \
-  "$ROOT$SYSCONFDIR/shiva/profiles" "$ROOT$SYSCONFDIR/systemd/system"
+  "$ROOT$SYSCONFDIR/shiva/profiles" "$ROOT$SYSCONFDIR/systemd/system" \
+  "$ROOT/var/lib/shiva/notify"
 install -m 0755 "$PROJECT_DIR"/bin/shiva* "$ROOT$PREFIX/bin/"
 install -m 0644 "$PROJECT_DIR"/lib/shiva/*.sh "$ROOT$PREFIX/lib/shiva/"
 install -m 0644 "$PROJECT_DIR"/lib/shiva/profiles/*.conf \
