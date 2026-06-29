@@ -46,6 +46,12 @@ grep -q 'Default mode' <<<"$repair_status"
 grep -q 'DRY RUN' <<<"$repair_status"
 grep -q 'Network target' <<<"$repair_status"
 
+verify_dns_output="$(
+  NO_COLOR=1 "$PROJECT_DIR/bin/shiva-repair" verify dns || true
+)"
+grep -q 'SHIVA VERIFY DNS' <<<"$verify_dns_output"
+grep -Eq 'DNS[[:space:]]+(OK|FAILED)' <<<"$verify_dns_output"
+
 notify_output="$(
   NO_COLOR=1 "$PROJECT_DIR/bin/shiva-notify" --dry-run --category test "test message"
 )"

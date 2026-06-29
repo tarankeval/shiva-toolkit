@@ -56,6 +56,7 @@ shiva repair status
 shiva repair network
 shiva repair openvpn
 shiva repair dns
+shiva repair verify dns
 shiva watchdog --once
 shiva watchdog --status
 shiva watchdog --config

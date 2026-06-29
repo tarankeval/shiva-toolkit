@@ -5,11 +5,13 @@ source "$SCRIPT_DIR/../lib/shiva/bootstrap.sh" 2>/dev/null || source /usr/local/
 shiva_load_common
 
 apply=false
+verify=false
 target=""
 
 usage() {
   cat <<'EOF'
 Usage: shiva repair [--apply] <target>
+       shiva repair verify <target>
 
 Targets:
   status    Show repair configuration
@@ -25,6 +27,7 @@ EOF
 while (($#)); do
   case "$1" in
     --apply) apply=true ;;
+    verify) verify=true ;;
     -h|--help|help) usage; exit 0 ;;
     status|network|openvpn|dns) target="$1" ;;
     *) printf 'Unknown repair option: %s\n' "$1" >&2; usage >&2; exit 1 ;;
@@ -55,6 +58,49 @@ history_result() {
   else
     shiva_history_add repair info "$target_name repair planned for $detail"
   fi
+}
+
+verify_network() {
+  local failures=0 interface="$SHIVA_REPAIR_INTERFACE"
+  [[ -n "$interface" ]] || interface="${REQUIRED_INTERFACES%% *}"
+  [[ -n "$interface" ]] || interface="$(shiva_default_route_interface || true)"
+
+  shiva_title "SHIVA VERIFY NETWORK v$SHIVA_VERSION"
+  shiva_gateway_ok && shiva_status ok "Gateway" "OK" ||
+    { shiva_status fail "Gateway" "FAILED"; ((failures+=1)); }
+  shiva_connectivity_ok && shiva_status ok "Internet" "OK" ||
+    { shiva_status fail "Internet" "FAILED"; ((failures+=1)); }
+  if [[ -n "$interface" ]]; then
+    shiva_interface_is_up "$interface" && shiva_status ok "Interface" "$interface UP" ||
+      { shiva_status fail "Interface" "$interface DOWN OR MISSING"; ((failures+=1)); }
+  else
+    shiva_status warn "Interface" "NOT SELECTED"
+  fi
+  (( failures == 0 ))
+}
+
+verify_openvpn() {
+  local state
+  shiva_title "SHIVA VERIFY OPENVPN v$SHIVA_VERSION"
+  state="$(shiva_openvpn_state)"
+  shiva_status "$(shiva_service_level "$state")" "OPENVPN" "$state"
+  [[ "$(shiva_service_level "$state")" == "ok" ]]
+}
+
+verify_dns() {
+  shiva_title "SHIVA VERIFY DNS v$SHIVA_VERSION"
+  shiva_dns_ok && { shiva_status ok "DNS" "OK"; return 0; }
+  shiva_status fail "DNS" "FAILED"
+  return 1
+}
+
+verify_target() {
+  case "$target" in
+    network) verify_network ;;
+    openvpn) verify_openvpn ;;
+    dns) verify_dns ;;
+    *) printf 'Verification is not available for target: %s\n' "$target" >&2; return 1 ;;
+  esac
 }
 
 repair_status() {
@@ -175,8 +221,18 @@ repair_dns() {
 }
 
 case "$target" in
-  status) repair_status ;;
-  network) repair_network ;;
-  openvpn) repair_openvpn ;;
-  dns) repair_dns ;;
+  status)
+    if [[ "$verify" == true ]]; then
+      printf 'Verification is not available for status.\n' >&2
+      exit 1
+    fi
+    repair_status
+    ;;
+  network|openvpn|dns)
+    if [[ "$verify" == true ]]; then
+      verify_target
+    else
+      "repair_$target"
+    fi
+    ;;
 esac
