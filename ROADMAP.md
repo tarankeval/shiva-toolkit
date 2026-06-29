@@ -224,6 +224,14 @@ Initial implementation status:
 - JSON output now starts adopting a shared `schema: 1` field;
 - `shiva dashboard` renders its terminal and JSON output from Health Engine
   data instead of collecting health state independently;
+- `shiva cluster` reads local state from the Health Engine-backed dashboard
+  snapshot, so Watchdog status is consistent between dashboard and cluster;
+- `shiva advisor` uses Health Engine checks and labels recommendations as
+  INFO, RECOMMENDED, or CRITICAL;
+- `shiva-watchdog` now has explicit `--once` and `--watch` modes, and the
+  systemd unit uses `--watch`;
+- `shiva-service` names the managed unit explicitly as
+  `shiva-watchdog.service`;
 - the existing human-readable `shiva health` output remains compatible.
 
 ## v1.3: Server Farm

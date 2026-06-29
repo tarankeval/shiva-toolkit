@@ -240,7 +240,7 @@ show_release_diagnostics() {
   done
 
   check_release_text "Package version" "packaging/build-deb.sh" "1.1.0~dev-1" "1.1.0~dev-1"
-  check_release_text "Systemd ExecStart" "packaging/systemd/shiva-watchdog.service" "ExecStart=@BINDIR@/shiva-watchdog" "watchdog service"
+  check_release_text "Systemd ExecStart" "packaging/systemd/shiva-watchdog.service" "ExecStart=@BINDIR@/shiva-watchdog --watch" "watchdog service"
   check_release_text "Notify state dir" "install.sh" "/var/lib/shiva/notify" "created by installer"
   check_release_text "README release doctor" "README.md" "shiva doctor release" "documented"
 

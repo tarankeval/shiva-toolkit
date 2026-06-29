@@ -74,6 +74,7 @@ advisor_output="$(
     "$PROJECT_DIR/bin/shiva-advisor" 10
 )"
 grep -q 'Recommendations' <<<"$advisor_output"
+grep -Eq 'INFO|RECOMMENDED|CRITICAL' <<<"$advisor_output"
 grep -q 'shiva history --level fail' <<<"$advisor_output"
 
 advisor_json="$(
@@ -82,8 +83,10 @@ advisor_json="$(
     "$PROJECT_DIR/bin/shiva-advisor" --json 10
 )"
 grep -q '"history_window":10' <<<"$advisor_json"
-grep -q '"failures":3' <<<"$advisor_json"
+grep -q '"schema":1' <<<"$advisor_json"
+grep -q '"source":"health-engine"' <<<"$advisor_json"
 grep -q '"recommendations":\[' <<<"$advisor_json"
+grep -q '"level":"CRITICAL"\|"level":"RECOMMENDED"\|"level":"INFO"' <<<"$advisor_json"
 
 NO_COLOR=1 SHIVA_HISTORY_FILE="$history_file" \
   SHIVA_WATCHDOG_STATE_FILE="$state_file" \
@@ -231,6 +234,11 @@ service_plan="$(
 )"
 grep -q 'PLAN systemctl enable shiva-watchdog' <<<"$service_plan"
 
+service_status_output="$(
+  NO_COLOR=1 "$PROJECT_DIR/bin/shiva-service" status || true
+)"
+grep -q 'shiva-watchdog.service' <<<"$service_status_output"
+
 nodes_output="$(
   NO_COLOR=1 SHIVA_NODES="local:server:localhost vpn:VPN:shiva-vpn" \
     "$PROJECT_DIR/bin/shiva-nodes"
@@ -249,20 +257,23 @@ cluster_output="$(
   NO_COLOR=1 SHIVA_HISTORY_FILE="$history_file" \
     SHIVA_WATCHDOG_STATE_FILE="$state_file" \
     SHIVA_NODES="local:server:localhost vpn:VPN:shiva-vpn" \
-    "$PROJECT_DIR/bin/shiva-cluster" 10
+    "$PROJECT_DIR/bin/shiva-cluster"
 )"
 grep -q 'SHIVA CLUSTER' <<<"$cluster_output"
 grep -q 'Nodes' <<<"$cluster_output"
-grep -q 'Advisor' <<<"$cluster_output"
+grep -q 'Watchdog' <<<"$cluster_output"
 
 cluster_json="$(
   NO_COLOR=1 SHIVA_HISTORY_FILE="$history_file" \
     SHIVA_WATCHDOG_STATE_FILE="$state_file" \
     SHIVA_NODES="local:server:localhost vpn:VPN:shiva-vpn" \
-    "$PROJECT_DIR/bin/shiva-cluster" --json 10
+    "$PROJECT_DIR/bin/shiva-cluster" --json
 )"
+grep -q '"schema":1' <<<"$cluster_json"
+grep -q '"source":"health-engine"' <<<"$cluster_json"
 grep -q '"nodes":2' <<<"$cluster_json"
 grep -q '"configured_nodes":1' <<<"$cluster_json"
+grep -q '"watchdog":' <<<"$cluster_json"
 
 printf 'ok\n' >"$state_file"
 NO_COLOR=1 SHIVA_WATCHDOG_STATE_FILE="$state_file" \
@@ -275,6 +286,17 @@ watchdog_config="$(
 grep -q 'Interval' <<<"$watchdog_config"
 grep -q 'Auto repair' <<<"$watchdog_config"
 grep -q 'Repair targets' <<<"$watchdog_config"
+
+watchdog_help="$(
+  NO_COLOR=1 "$PROJECT_DIR/bin/shiva-watchdog" --help
+)"
+grep -q -- '--watch' <<<"$watchdog_help"
+
+watchdog_watch_output="$(
+  NO_COLOR=1 SHIVA_WATCHDOG_INTERVAL=1 SHIVA_WATCHDOG_STATE_FILE="$state_file" \
+    timeout 2 "$PROJECT_DIR/bin/shiva-watchdog" --watch 2>/dev/null || true
+)"
+grep -q 'Press Ctrl+C to stop' <<<"$watchdog_watch_output"
 
 printf 'fail:3\n' >"$state_file"
 if NO_COLOR=1 SHIVA_WATCHDOG_STATE_FILE="$state_file" \

@@ -6,7 +6,7 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-ExecStart=@BINDIR@/shiva-watchdog
+ExecStart=@BINDIR@/shiva-watchdog --watch
 Restart=always
 RestartSec=10
 

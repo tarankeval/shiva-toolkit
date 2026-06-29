@@ -70,6 +70,7 @@ shiva doctor state
 shiva doctor release
 shiva doctor release --json
 shiva watchdog --once
+shiva watchdog --watch
 shiva watchdog --status
 shiva watchdog --config
 shiva history
@@ -120,6 +121,10 @@ The watchdog is installed with a systemd unit:
 ```bash
 sudo systemctl enable --now shiva-watchdog
 ```
+
+The systemd unit runs `shiva-watchdog --watch` explicitly. Manual checks should
+use `shiva watchdog --once`; continuous foreground runs use `shiva watchdog
+--watch` and print `Press Ctrl+C to stop`.
 
 ## Install
 

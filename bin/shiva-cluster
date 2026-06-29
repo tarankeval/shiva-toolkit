@@ -5,13 +5,12 @@ source "$SCRIPT_DIR/../lib/shiva/bootstrap.sh" 2>/dev/null || source /usr/local/
 shiva_load_common
 
 json=false
-limit=50
 
 usage() {
   cat <<'EOF'
-Usage: shiva cluster [--json] [history-lines]
+Usage: shiva cluster [--json]
 
-Show a compact infrastructure overview built from local dashboard and nodes.
+Show a compact infrastructure overview built from local Health Engine and nodes.
 Remote node health checks are not performed yet.
 EOF
 }
@@ -20,18 +19,17 @@ while (($#)); do
   case "$1" in
     --json) json=true ;;
     -h|--help|help) usage; exit 0 ;;
-    *) limit="$1" ;;
+    *) printf 'Unknown cluster option: %s\n' "$1" >&2; usage >&2; exit 1 ;;
   esac
   shift
 done
 
-if [[ ! "$limit" =~ ^[0-9]+$ ]]; then
-  printf 'Cluster history line count must be a number.\n' >&2
-  exit 1
-fi
+json_escape() {
+  shiva_health_engine_json_escape "$1"
+}
 
 node_counts() {
-  local entry host status total=0 local_count=0 configured_count=0
+  local entry host total=0 local_count=0 configured_count=0
   for entry in $SHIVA_NODES; do
     IFS=':' read -r _name _role host _extra <<<"$entry"
     [[ -n "${_name:-}" ]] || continue
@@ -46,39 +44,43 @@ node_counts() {
   printf '%s %s %s' "$total" "$local_count" "$configured_count"
 }
 
+dashboard_json="$("$SCRIPT_DIR/shiva-dashboard" --json 2>/dev/null || true)"
 dashboard_value() {
   local key="$1"
-  "$SCRIPT_DIR/shiva-dashboard" --json "$limit" 2>/dev/null |
-    sed -n "s/.*\"$key\":\\([^,}]*\\).*/\\1/p" |
+  sed -n "s/.*\"$key\":\\([^,}]*\\).*/\\1/p" <<<"$dashboard_json" |
     sed 's/^"//;s/"$//'
 }
 
 read -r node_total node_local node_configured < <(node_counts)
+overall="$(dashboard_value overall)"
+health_percent="$(dashboard_value health_percent)"
 failures="$(dashboard_value failures)"
 warnings="$(dashboard_value warnings)"
-advisor_recommendations="$(dashboard_value advisor_recommendations)"
 watchdog="$(dashboard_value watchdog)"
-service="$(dashboard_value service)"
 telegram="$(dashboard_value telegram)"
 
+: "${overall:=unknown}"
+: "${health_percent:=0}"
 : "${failures:=0}"
 : "${warnings:=0}"
-: "${advisor_recommendations:=0}"
 : "${watchdog:=unknown}"
-: "${service:=unknown}"
 : "${telegram:=disabled}"
 
 if [[ "$json" == true ]]; then
   printf '{'
+  printf '"schema":%s,' "$SHIVA_JSON_SCHEMA"
+  printf '"version":"%s",' "$(json_escape "$SHIVA_VERSION")"
+  printf '"hostname":"%s",' "$(json_escape "$SHIVA_HOSTNAME")"
+  printf '"source":"health-engine",'
   printf '"nodes":%s,' "$node_total"
   printf '"local_nodes":%s,' "$node_local"
   printf '"configured_nodes":%s,' "$node_configured"
+  printf '"overall":"%s",' "$(json_escape "$overall")"
+  printf '"health_percent":%s,' "$health_percent"
   printf '"failures":%s,' "$failures"
   printf '"warnings":%s,' "$warnings"
-  printf '"advisor_recommendations":%s,' "$advisor_recommendations"
-  printf '"watchdog":"%s",' "$watchdog"
-  printf '"service":"%s",' "$service"
-  printf '"telegram":"%s"' "$telegram"
+  printf '"watchdog":"%s",' "$(json_escape "$watchdog")"
+  printf '"telegram":"%s"' "$(json_escape "$telegram")"
   printf '}\n'
   exit 0
 fi
@@ -86,16 +88,16 @@ fi
 shiva_title "SHIVA CLUSTER v$SHIVA_VERSION"
 shiva_status ok "Nodes" "$node_total total, $node_local local, $node_configured configured"
 
+case "$overall" in
+  excellent) shiva_status ok "Health" "${health_percent}%" ;;
+  good_with_warnings) shiva_status warn "Health" "${health_percent}%" ;;
+  *) shiva_status fail "Health" "${health_percent}%" ;;
+esac
+
 case "$watchdog" in
   ok) shiva_status ok "Watchdog" "OK" ;;
   fail:*) shiva_status fail "Watchdog" "$watchdog" ;;
   *) shiva_status warn "Watchdog" "$watchdog" ;;
-esac
-
-case "$service" in
-  active) shiva_status ok "Service" "$service" ;;
-  inactive|failed) shiva_status fail "Service" "$service" ;;
-  *) shiva_status warn "Service" "$service" ;;
 esac
 
 if (( failures > 0 )); then
@@ -108,12 +110,6 @@ if (( warnings > 0 )); then
   shiva_status warn "Warnings" "$warnings"
 else
   shiva_status ok "Warnings" "$warnings"
-fi
-
-if (( advisor_recommendations > 0 )); then
-  shiva_status warn "Advisor" "$advisor_recommendations recommendation(s)"
-else
-  shiva_status ok "Advisor" "NO IMMEDIATE RECOMMENDATIONS"
 fi
 
 case "$telegram" in

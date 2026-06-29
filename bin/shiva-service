@@ -34,6 +34,7 @@ systemctl_available() {
 service_status() {
   local active enabled
   shiva_title "SHIVA SERVICE v$SHIVA_VERSION"
+  shiva_status ok "Managed service" "${service}.service"
   if ! systemctl_available; then
     shiva_status warn "systemctl" "UNAVAILABLE"
     return 1
@@ -41,18 +42,18 @@ service_status() {
 
   if systemctl is-active --quiet "$service" 2>/dev/null; then
     active="ACTIVE"
-    shiva_status ok "Service" "$active"
+    shiva_status ok "${service}.service" "$active"
   else
     active="$(systemctl is-active "$service" 2>/dev/null || true)"
     [[ -n "$active" ]] || active="UNKNOWN"
-    shiva_status warn "Service" "$active"
+    shiva_status warn "${service}.service" "$active"
   fi
 
   enabled="$(systemctl is-enabled "$service" 2>/dev/null || true)"
   case "$enabled" in
-    enabled) shiva_status ok "Enabled" "$enabled" ;;
-    disabled) shiva_status warn "Enabled" "$enabled" ;;
-    *) shiva_status warn "Enabled" "${enabled:-UNKNOWN}" ;;
+    enabled) shiva_status ok "${service}.service enabled" "$enabled" ;;
+    disabled) shiva_status warn "${service}.service enabled" "$enabled" ;;
+    *) shiva_status warn "${service}.service enabled" "${enabled:-UNKNOWN}" ;;
   esac
 }
 

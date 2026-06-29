@@ -65,7 +65,7 @@ test -r "$stage/etc/shiva/shiva.conf"
 test -d "$stage/var/lib/shiva"
 test -d "$stage/var/lib/shiva/notify"
 test -r "$stage/etc/systemd/system/shiva-watchdog.service"
-grep -q 'ExecStart=/usr/local/bin/shiva-watchdog' \
+grep -q 'ExecStart=/usr/local/bin/shiva-watchdog --watch' \
   "$stage/etc/systemd/system/shiva-watchdog.service"
 
 printf 'Smoke tests passed.\n'

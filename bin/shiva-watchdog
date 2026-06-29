@@ -4,15 +4,17 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../lib/shiva/bootstrap.sh" 2>/dev/null || source /usr/local/lib/shiva/bootstrap.sh
 shiva_load_common
 
-once=false
+mode=""
 status_only=false
 config_only=false
 
 usage() {
   cat <<'EOF'
-Usage: shiva watchdog [--once] [--status] [--config]
+Usage: shiva watchdog [--once|--watch] [--status] [--config]
 
-Run Shiva Toolkit watchdog checks. Use --once for a single check cycle.
+Run Shiva Toolkit watchdog checks.
+Use --once for a single check cycle.
+Use --watch for continuous service mode.
 Use --status to show the last recorded watchdog state without running checks.
 Use --config to show watchdog automation settings.
 EOF
@@ -20,7 +22,8 @@ EOF
 
 while (($#)); do
   case "$1" in
-    --once) once=true ;;
+    --once) mode="once" ;;
+    --watch) mode="watch" ;;
     --status) status_only=true ;;
     --config) config_only=true ;;
     -h|--help|help) usage; exit 0 ;;
@@ -82,6 +85,12 @@ fi
 if [[ "$config_only" == true ]]; then
   show_config
   exit 0
+fi
+
+if [[ -z "$mode" ]]; then
+  printf 'Choose an explicit watchdog mode: --once or --watch.\n' >&2
+  usage >&2
+  exit 1
 fi
 
 add_repair_target() {
@@ -226,10 +235,14 @@ watchdog_cycle() {
   return 0
 }
 
+if [[ "$mode" == "watch" ]]; then
+  printf 'Press Ctrl+C to stop.\n'
+fi
+
 while true; do
   shiva_title "SHIVA WATCHDOG v$SHIVA_VERSION"
   watchdog_cycle
   rc=$?
-  [[ "$once" == true ]] && exit "$rc"
+  [[ "$mode" == "once" ]] && exit "$rc"
   sleep "$SHIVA_WATCHDOG_INTERVAL"
 done

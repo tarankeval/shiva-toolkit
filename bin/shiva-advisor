@@ -7,12 +7,15 @@ shiva_load_common
 limit=100
 json=false
 notify=false
+health_tmp="$(mktemp "${TMPDIR:-/tmp}/shiva-advisor.XXXXXX")" || exit 1
+trap 'rm -f "$health_tmp"' EXIT
 
 usage() {
   cat <<'EOF'
 Usage: shiva advisor [--json] [--notify] [lines]
 
-Show deterministic recommendations based on Shiva configuration and history.
+Show deterministic recommendations based on Shiva Health Engine and history.
+Recommendation levels: INFO, RECOMMENDED, CRITICAL.
 EOF
 }
 
@@ -31,11 +34,13 @@ if [[ ! "$limit" =~ ^[0-9]+$ ]]; then
   exit 1
 fi
 
-recommendations=()
+recommendation_levels=()
+recommendation_messages=()
 
 recommend() {
-  local message="$1"
-  recommendations+=("$message")
+  local level="$1" message="$2"
+  recommendation_levels+=("$level")
+  recommendation_messages+=("$message")
 }
 
 history_count() {
@@ -51,88 +56,97 @@ watchdog_state() {
 }
 
 json_escape() {
-  local value="$1"
-  value="${value//\\/\\\\}"
-  value="${value//\"/\\\"}"
-  value="${value//$'\n'/\\n}"
-  value="${value//$'\t'/\\t}"
-  printf '%s' "$value"
+  shiva_health_engine_json_escape "$1"
 }
 
 print_json() {
-  local index recommendation
+  local index
   printf '{'
+  printf '"schema":%s,' "$SHIVA_JSON_SCHEMA"
+  printf '"version":"%s",' "$(json_escape "$SHIVA_VERSION")"
+  printf '"source":"health-engine",'
   printf '"history_window":%s,' "$limit"
   printf '"failures":%s,' "$fail_count"
   printf '"warnings":%s,' "$warn_count"
   printf '"watchdog_state":"%s",' "$(json_escape "$state")"
   printf '"recommendations":['
-  for index in "${!recommendations[@]}"; do
-    recommendation="${recommendations[$index]}"
+  for index in "${!recommendation_messages[@]}"; do
     (( index > 0 )) && printf ','
-    printf '"%s"' "$(json_escape "$recommendation")"
+    printf '{"level":"%s","message":"%s"}' \
+      "$(json_escape "${recommendation_levels[$index]}")" \
+      "$(json_escape "${recommendation_messages[$index]}")"
   done
-  printf ']}'
-  printf '\n'
+  printf ']}\n'
 }
 
 print_text() {
-  local recommendation
+  local index
   shiva_title "SHIVA ADVISOR v$SHIVA_VERSION"
+  printf 'Source: Health Engine\n'
   printf 'History window: last %s event(s)\n' "$limit"
   printf 'Failures: %s\n' "$fail_count"
   printf 'Warnings: %s\n' "$warn_count"
   [[ -n "$state" ]] && printf 'Watchdog state: %s\n' "$state"
   printf '\nRecommendations\n'
-  if (( ${#recommendations[@]} == 0 )); then
+  if (( ${#recommendation_messages[@]} == 0 )); then
     printf 'No immediate recommendations.\n'
     return 0
   fi
-  for recommendation in "${recommendations[@]}"; do
-    printf '%s\n' "- $recommendation"
+  for index in "${!recommendation_messages[@]}"; do
+    printf '%-11s %s\n' "${recommendation_levels[$index]}" "${recommendation_messages[$index]}"
   done
 }
 
 notify_recommendations() {
-  local recommendation message
-  (( ${#recommendations[@]} > 0 )) || return 0
+  local index message
+  (( ${#recommendation_messages[@]} > 0 )) || return 0
   message="Shiva Advisor recommendations:"
-  for recommendation in "${recommendations[@]}"; do
-    message+=$'\n- '"$recommendation"
+  for index in "${!recommendation_messages[@]}"; do
+    message+=$'\n'"${recommendation_levels[$index]}: ${recommendation_messages[$index]}"
   done
   "$SCRIPT_DIR/shiva-notify" --category advisor "$message"
 }
 
-fail_count="$(history_count fail)"
-warn_count="$(history_count warn)"
+shiva_health_engine_collect >"$health_tmp"
+fail_count="$(awk -F '\t' '$1 == "fail" {count += 1} END {print count + 0}' "$health_tmp")"
+warn_count="$(awk -F '\t' '$1 == "warn" {count += 1} END {print count + 0}' "$health_tmp")"
+history_fail_count="$(history_count fail)"
+history_warn_count="$(history_count warn)"
 state="$(watchdog_state || true)"
 
-if (( fail_count > 0 )); then
-  recommend "Review recent failures with: shiva history --level fail"
+while IFS=$'\t' read -r level key label value; do
+  case "$level" in
+    fail) recommend "CRITICAL" "$label is failing: $value" ;;
+    warn) recommend "RECOMMENDED" "$label needs attention: $value" ;;
+  esac
+done <"$health_tmp"
+
+if (( history_fail_count > 0 )); then
+  recommend "RECOMMENDED" "Review recent failures with: shiva history --level fail"
 fi
 
-if (( warn_count > 0 )); then
-  recommend "Review warnings with: shiva history --level warn"
+if (( history_warn_count > 0 )); then
+  recommend "INFO" "Review warnings with: shiva history --level warn"
 fi
 
 case "$state" in
   fail:*)
-    recommend "Inspect watchdog state with: shiva watchdog --status"
-    recommend "Verify affected repair targets before applying changes"
+    recommend "CRITICAL" "Inspect watchdog state with: shiva watchdog --status"
+    recommend "RECOMMENDED" "Verify affected repair targets before applying changes"
     ;;
   "")
-    recommend "Run one watchdog cycle with: shiva watchdog --once"
+    recommend "INFO" "Run one watchdog cycle with: shiva watchdog --once"
     ;;
 esac
 
 if ! shiva_enabled "$SHIVA_TELEGRAM_ENABLED"; then
-  recommend "Configure Telegram notifications before relying on unattended watchdog alerts"
+  recommend "INFO" "Configure Telegram notifications before relying on unattended watchdog alerts"
 elif [[ -z "$SHIVA_TELEGRAM_BOT_TOKEN" || -z "$SHIVA_TELEGRAM_CHAT_ID" ]]; then
-  recommend "Complete Telegram token and chat ID configuration"
+  recommend "RECOMMENDED" "Complete Telegram token and chat ID configuration"
 fi
 
 if ! shiva_enabled "$SHIVA_WATCHDOG_AUTO_REPAIR"; then
-  recommend "Keep auto-repair disabled until repair targets are verified on this host"
+  recommend "INFO" "Keep auto-repair disabled until repair targets are verified on this host"
 fi
 
 if [[ "$json" == true ]]; then
