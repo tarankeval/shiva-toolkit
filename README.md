@@ -79,6 +79,7 @@ running with the required permissions.
 
 When `SHIVA_WATCHDOG_AUTO_REPAIR=true`, watchdog maps failures to repair
 targets and only runs targets allowed by `SHIVA_WATCHDOG_REPAIR_TARGETS`.
+Automatic repairs use `--verify-after` so the result is recorded in history.
 When Telegram is configured, watchdog can send notifications on state changes.
 Notifications support category cooldowns through `SHIVA_NOTIFY_COOLDOWN_SECONDS`.
 

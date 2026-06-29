@@ -112,7 +112,7 @@ run_auto_repairs() {
   local target
   for target in "${repair_targets[@]:-}"; do
     if repair_target_allowed "$target"; then
-      "$SCRIPT_DIR/shiva-repair" --apply "$target" || true
+      "$SCRIPT_DIR/shiva-repair" --apply --verify-after "$target" || true
     else
       shiva_history_add watchdog info "auto-repair skipped for $target: not allowed"
     fi
