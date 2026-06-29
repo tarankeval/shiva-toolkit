@@ -69,6 +69,7 @@ dashboard_output="$(
 )"
 grep -q 'SHIVA DASHBOARD' <<<"$dashboard_output"
 grep -q 'Watchdog' <<<"$dashboard_output"
+grep -q 'Service' <<<"$dashboard_output"
 grep -q 'Recent failures' <<<"$dashboard_output"
 
 dashboard_json="$(
@@ -77,6 +78,7 @@ dashboard_json="$(
     "$PROJECT_DIR/bin/shiva-dashboard" --json 10
 )"
 grep -q '"failures":1' <<<"$dashboard_json"
+grep -q '"service":' <<<"$dashboard_json"
 grep -q '"telegram":"disabled"' <<<"$dashboard_json"
 
 repair_history="$stage/repair-history.log"

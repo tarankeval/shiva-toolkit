@@ -41,6 +41,14 @@ watchdog_state() {
   cat "$SHIVA_WATCHDOG_STATE_FILE"
 }
 
+service_state() {
+  shiva_have systemctl || { printf 'UNAVAILABLE'; return 0; }
+  local state
+  state="$(systemctl is-active shiva-watchdog 2>/dev/null || true)"
+  [[ -n "$state" ]] || state="UNKNOWN"
+  printf '%s' "$state"
+}
+
 recommendation_count() {
   "$SCRIPT_DIR/shiva-advisor" --json "$limit" 2>/dev/null |
     awk -F '"recommendations":\\[' '
@@ -66,6 +74,7 @@ json_escape() {
 }
 
 state="$(watchdog_state)"
+service="$(service_state)"
 fail_count="$(history_count fail)"
 warn_count="$(history_count warn)"
 info_count="$(history_count info)"
@@ -75,6 +84,7 @@ advisor_count="$(recommendation_count)"
 if [[ "$json" == true ]]; then
   printf '{'
   printf '"watchdog":"%s",' "$(json_escape "$state")"
+  printf '"service":"%s",' "$(json_escape "$service")"
   printf '"failures":%s,' "$fail_count"
   printf '"warnings":%s,' "$warn_count"
   printf '"info_events":%s,' "$info_count"
@@ -95,6 +105,13 @@ case "$state" in
   fail:*) shiva_status fail "Watchdog" "$state" ;;
   "NO DATA") shiva_status warn "Watchdog" "NO DATA" ;;
   *) shiva_status warn "Watchdog" "$state" ;;
+esac
+
+case "$service" in
+  active) shiva_status ok "Service" "active" ;;
+  inactive|failed) shiva_status fail "Service" "$service" ;;
+  UNAVAILABLE) shiva_status warn "Service" "UNAVAILABLE" ;;
+  *) shiva_status warn "Service" "$service" ;;
 esac
 
 if (( fail_count > 0 )); then
