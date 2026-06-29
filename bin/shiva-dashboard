@@ -1,0 +1,99 @@
+#!/usr/bin/env bash
+set -u
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../lib/shiva/bootstrap.sh" 2>/dev/null || source /usr/local/lib/shiva/bootstrap.sh
+shiva_load_common
+
+limit="${1:-50}"
+
+usage() {
+  cat <<'EOF'
+Usage: shiva dashboard [history-lines]
+
+Show a compact operational dashboard for Shiva Toolkit.
+EOF
+}
+
+case "$limit" in
+  -h|--help|help) usage; exit 0 ;;
+esac
+
+if [[ ! "$limit" =~ ^[0-9]+$ ]]; then
+  printf 'Dashboard history line count must be a number.\n' >&2
+  exit 1
+fi
+
+history_count() {
+  local level="$1"
+  [[ -r "$SHIVA_HISTORY_FILE" ]] || { printf '0'; return 0; }
+  tail -n "$limit" "$SHIVA_HISTORY_FILE" |
+    awk -F '\t' -v level="$level" '$2 == level {count += 1} END {print count + 0}'
+}
+
+watchdog_state() {
+  [[ -r "$SHIVA_WATCHDOG_STATE_FILE" ]] || { printf 'NO DATA'; return 0; }
+  cat "$SHIVA_WATCHDOG_STATE_FILE"
+}
+
+recommendation_count() {
+  "$SCRIPT_DIR/shiva-advisor" --json "$limit" 2>/dev/null |
+    awk -F '"recommendations":\\[' '
+      NF > 1 {
+        split($2, parts, "]")
+        if (parts[1] == "") {
+          print 0
+        } else {
+          n = split(parts[1], values, "\",\"")
+          print n
+        }
+      }
+    '
+}
+
+shiva_title "SHIVA DASHBOARD v$SHIVA_VERSION"
+
+state="$(watchdog_state)"
+fail_count="$(history_count fail)"
+warn_count="$(history_count warn)"
+info_count="$(history_count info)"
+advisor_count="$(recommendation_count)"
+[[ -n "$advisor_count" ]] || advisor_count=0
+
+case "$state" in
+  ok) shiva_status ok "Watchdog" "OK" ;;
+  fail:*) shiva_status fail "Watchdog" "$state" ;;
+  "NO DATA") shiva_status warn "Watchdog" "NO DATA" ;;
+  *) shiva_status warn "Watchdog" "$state" ;;
+esac
+
+if (( fail_count > 0 )); then
+  shiva_status fail "Failures" "$fail_count"
+else
+  shiva_status ok "Failures" "$fail_count"
+fi
+if (( warn_count > 0 )); then
+  shiva_status warn "Warnings" "$warn_count"
+else
+  shiva_status ok "Warnings" "$warn_count"
+fi
+shiva_status ok "Info events" "$info_count"
+
+if (( advisor_count > 0 )); then
+  shiva_status warn "Advisor" "$advisor_count recommendation(s)"
+else
+  shiva_status ok "Advisor" "NO IMMEDIATE RECOMMENDATIONS"
+fi
+
+if shiva_enabled "$SHIVA_TELEGRAM_ENABLED"; then
+  shiva_status ok "Telegram" "ENABLED"
+else
+  shiva_status warn "Telegram" "DISABLED"
+fi
+
+printf '\nRecent failures:\n'
+if [[ -r "$SHIVA_HISTORY_FILE" ]]; then
+  tail -n "$limit" "$SHIVA_HISTORY_FILE" |
+    awk -F '\t' '$2 == "fail" {printf "  %s %-12s %s\n", $1, $3, $4; shown += 1} END {exit shown == 0}'
+else
+  false
+fi || printf '  none\n'

@@ -19,12 +19,14 @@ grep -q 'repair   Plan or apply guided repairs' <<<"$help_output"
 grep -q 'watchdog Run automation checks' <<<"$help_output"
 grep -q 'history  Show operational history' <<<"$help_output"
 grep -q 'advisor  Show operational recommendations' <<<"$help_output"
+grep -q 'dashboard Show compact operational dashboard' <<<"$help_output"
 grep -q 'notify   Send configured notifications' <<<"$help_output"
 NO_COLOR=1 "$PROJECT_DIR/bin/shiva-doctor" >/dev/null || [[ $? -eq 2 ]]
 NO_COLOR=1 SHIVA_HISTORY_FILE="$stage_history" "$PROJECT_DIR/bin/shiva-history" >/dev/null
 NO_COLOR=1 "$PROJECT_DIR/bin/shiva-repair" --help >/dev/null
 NO_COLOR=1 "$PROJECT_DIR/bin/shiva-watchdog" --help >/dev/null
 NO_COLOR=1 "$PROJECT_DIR/bin/shiva-advisor" --help >/dev/null
+NO_COLOR=1 "$PROJECT_DIR/bin/shiva-dashboard" --help >/dev/null
 NO_COLOR=1 "$PROJECT_DIR/bin/shiva-notify" --help >/dev/null
 bash "$PROJECT_DIR/tests/health-vpn.sh"
 bash "$PROJECT_DIR/tests/profiles.sh"

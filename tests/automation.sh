@@ -62,6 +62,15 @@ NO_COLOR=1 SHIVA_HISTORY_FILE="$history_file" \
   "$PROJECT_DIR/bin/shiva-advisor" --notify 10 >/dev/null
 grep -q 'notification skipped: telegram disabled' "$history_file"
 
+dashboard_output="$(
+  NO_COLOR=1 SHIVA_HISTORY_FILE="$history_file" \
+    SHIVA_WATCHDOG_STATE_FILE="$state_file" \
+    "$PROJECT_DIR/bin/shiva-dashboard" 10
+)"
+grep -q 'SHIVA DASHBOARD' <<<"$dashboard_output"
+grep -q 'Watchdog' <<<"$dashboard_output"
+grep -q 'Recent failures' <<<"$dashboard_output"
+
 repair_history="$stage/repair-history.log"
 repair_output="$(
   NO_COLOR=1 SHIVA_HISTORY_FILE="$repair_history" SHIVA_REPAIR_INTERFACE=lo \
