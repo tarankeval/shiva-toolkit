@@ -32,6 +32,9 @@ Commands:
     help_text+=$'\n  docker   Docker status'
   help_text+=$'\n  update   Check or apply system updates'
   help_text+=$'\n  doctor   Diagnose common problems'
+  help_text+=$'\n  repair   Plan or apply guided repairs'
+  help_text+=$'\n  watchdog Run automation checks'
+  help_text+=$'\n  history  Show operational history'
   help_text+=$'\n  logs     Show important system logs'
   help_text+=$'\n  backup   Inspect configured backups'
   printf '%s\n' "$help_text"
@@ -51,8 +54,8 @@ show_menu() {
       menu_labels+=("Docker")
       menu_commands+=("docker")
     fi
-    menu_labels+=("System Update" "Repair / Doctor" "Logs" "Backups")
-    menu_commands+=("update" "doctor" "logs" "backup")
+    menu_labels+=("System Update" "Repair / Doctor" "Guided Repair" "Watchdog" "History" "Logs" "Backups")
+    menu_commands+=("update" "doctor" "repair" "watchdog" "history" "logs" "backup")
 
     clear 2>/dev/null || true
     shiva_title "SHIVA TOOLKIT v$SHIVA_VERSION"

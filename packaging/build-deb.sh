@@ -3,7 +3,7 @@ set -euo pipefail
 
 PROJECT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 PACKAGE_NAME="shiva-toolkit"
-PACKAGE_VERSION="1.0.0-1"
+PACKAGE_VERSION="1.1.0~dev-1"
 ARCHITECTURE="all"
 BUILD_DIR="$PROJECT_DIR/build/deb"
 PACKAGE_ROOT="$BUILD_DIR/${PACKAGE_NAME}_${PACKAGE_VERSION}_${ARCHITECTURE}"

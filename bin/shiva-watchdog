@@ -1,0 +1,101 @@
+#!/usr/bin/env bash
+set -u
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../lib/shiva/bootstrap.sh" 2>/dev/null || source /usr/local/lib/shiva/bootstrap.sh
+shiva_load_common
+
+once=false
+
+usage() {
+  cat <<'EOF'
+Usage: shiva watchdog [--once]
+
+Run Shiva Toolkit watchdog checks. Use --once for a single check cycle.
+EOF
+}
+
+while (($#)); do
+  case "$1" in
+    --once) once=true ;;
+    -h|--help|help) usage; exit 0 ;;
+    *) printf 'Unknown watchdog option: %s\n' "$1" >&2; usage >&2; exit 1 ;;
+  esac
+  shift
+done
+
+watchdog_cycle() {
+  local failures=0 state root_percent raw_temp interface
+
+  shiva_gateway_ok &&
+    shiva_status ok "Gateway" "OK" ||
+    { shiva_status fail "Gateway" "FAILED"; ((failures+=1)); }
+
+  shiva_connectivity_ok &&
+    shiva_status ok "Internet" "OK" ||
+    { shiva_status fail "Internet" "FAILED"; ((failures+=1)); }
+
+  shiva_dns_ok &&
+    shiva_status ok "DNS" "OK" ||
+    { shiva_status fail "DNS" "FAILED"; ((failures+=1)); }
+
+  if shiva_check_enabled CHECK_INTERFACES; then
+    if [[ -n "$REQUIRED_INTERFACES" ]]; then
+      for interface in $REQUIRED_INTERFACES; do
+        shiva_required_interface_healthy "$interface" &&
+          shiva_status ok "Interface $interface" "UP" ||
+          { shiva_status fail "Interface $interface" "DOWN OR MISSING"; ((failures+=1)); }
+      done
+    fi
+  fi
+
+  if shiva_check_enabled CHECK_OPENVPN; then
+    state="$(shiva_openvpn_state)"
+    if [[ "$(shiva_service_level "$state")" == "ok" ]]; then
+      shiva_status ok "OPENVPN" "$state"
+    else
+      shiva_status fail "OPENVPN" "$state"
+      ((failures+=1))
+    fi
+  fi
+
+  read -r root_percent < <(df -P / | awk 'NR==2 {gsub("%","",$5); print $5}')
+  if (( root_percent >= 95 )); then
+    shiva_status fail "Root FS" "${root_percent}%"
+    ((failures+=1))
+  elif (( root_percent >= 85 )); then
+    shiva_status warn "Root FS" "${root_percent}%"
+  else
+    shiva_status ok "Root FS" "${root_percent}%"
+  fi
+
+  if shiva_check_enabled CHECK_TEMPERATURE && [[ -r /sys/class/thermal/thermal_zone0/temp ]]; then
+    raw_temp="$(< /sys/class/thermal/thermal_zone0/temp)"
+    if (( raw_temp >= 80000 )); then
+      shiva_status fail "CPU" "$((raw_temp / 1000))C"
+      ((failures+=1))
+    elif (( raw_temp >= 70000 )); then
+      shiva_status warn "CPU" "$((raw_temp / 1000))C"
+    else
+      shiva_status ok "CPU" "$((raw_temp / 1000))C"
+    fi
+  fi
+
+  if (( failures > 0 )); then
+    shiva_history_add watchdog fail "$failures failure(s) detected"
+    if shiva_enabled "$SHIVA_WATCHDOG_AUTO_REPAIR"; then
+      "$SCRIPT_DIR/shiva-repair" --apply network || true
+    fi
+    return 2
+  fi
+
+  shiva_history_add watchdog ok "all checks passed"
+  return 0
+}
+
+while true; do
+  shiva_title "SHIVA WATCHDOG v$SHIVA_VERSION"
+  watchdog_cycle
+  rc=$?
+  [[ "$once" == true ]] && exit "$rc"
+  sleep "$SHIVA_WATCHDOG_INTERVAL"
+done

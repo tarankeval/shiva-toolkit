@@ -1,9 +1,11 @@
 # Shiva Server Toolkit
 
-**v1.0.0 Stable**
+**v1.1.0-dev Automation Preview**
 
 An extensible command-line toolkit for Linux server health, networking, VPN,
 Docker, updates, diagnostics, logs, and backups.
+
+Future development is tracked in [ROADMAP.md](ROADMAP.md).
 
 ## Release notes v1.0.0
 
@@ -34,12 +36,31 @@ shiva-vpn         OpenVPN, OCSERV, and Amnezia status
 shiva-docker      Docker service and containers
 shiva-update      Available system updates
 shiva-doctor      Toolkit and host diagnostics
+shiva-repair      Guided dry-run or applied repairs
+shiva-watchdog    Automation checks for service supervision
+shiva-history     Local operational history
 shiva-logs        Recent warning/error logs
 shiva-backup      Backup freshness check
 ```
 
 The same modules can also be called as subcommands, for example
 `shiva health` and `shiva network`.
+
+## Automation preview
+
+The `v1.1` development branch introduces the first automation commands:
+
+```bash
+shiva repair network
+shiva repair openvpn
+shiva repair dns
+shiva watchdog --once
+shiva history
+```
+
+`shiva repair` runs in dry-run mode by default and prints planned actions.
+Use `--apply` only when the target profile is configured and the command is
+running with the required permissions.
 
 ## Install
 
@@ -60,13 +81,13 @@ make deb
 The package will be written to:
 
 ```text
-dist/shiva-toolkit_1.0.0-1_all.deb
+dist/shiva-toolkit_1.1.0~dev-1_all.deb
 ```
 
 Install it on Debian or Ubuntu:
 
 ```bash
-sudo apt install ./dist/shiva-toolkit_1.0.0-1_all.deb
+sudo apt install ./dist/shiva-toolkit_1.1.0~dev-1_all.deb
 ```
 
 The DEB package installs:

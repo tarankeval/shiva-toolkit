@@ -2,8 +2,8 @@
 
 set -o pipefail
 
-SHIVA_VERSION="1.0.0"
-SHIVA_RELEASE="Stable"
+SHIVA_VERSION="1.1.0-dev"
+SHIVA_RELEASE="Automation Preview"
 SHIVA_PRODUCT="Shiva Toolkit"
 SHIVA_CONFIG="${SHIVA_CONFIG:-/etc/shiva/shiva.conf}"
 SHIVA_PROFILE_DIR="${SHIVA_PROFILE_DIR:-/etc/shiva/profiles}"
@@ -36,6 +36,12 @@ fi
 : "${REQUIRED_INTERFACES:=}"
 : "${REQUIRED_INTERFACE:=}"
 : "${SMART_DISK:=}"
+: "${SHIVA_STATE_DIR:=/var/lib/shiva}"
+: "${SHIVA_HISTORY_FILE:=$SHIVA_STATE_DIR/history.log}"
+: "${SHIVA_REPAIR_INTERFACE:=}"
+: "${SHIVA_OPENVPN_SERVICE:=}"
+: "${SHIVA_WATCHDOG_INTERVAL:=60}"
+: "${SHIVA_WATCHDOG_AUTO_REPAIR:=false}"
 
 shiva_detect_hostname() {
   local detected
@@ -286,4 +292,29 @@ shiva_require_root() {
     printf 'This action requires root. Run with sudo.\n' >&2
     return 1
   fi
+}
+
+shiva_default_route_interface() {
+  shiva_have ip || return 1
+  ip route show default 2>/dev/null | awk '/^default/ {for (i=1; i<=NF; i++) if ($i == "dev") {print $(i+1); exit}}'
+}
+
+shiva_history_add() {
+  local module="$1" level="$2" message="$3" dir
+  dir="$(dirname -- "$SHIVA_HISTORY_FILE")"
+  mkdir -p "$dir" 2>/dev/null || return 0
+  printf '%s\t%s\t%s\t%s\n' "$(date -Iseconds)" "$level" "$module" "$message" \
+    >>"$SHIVA_HISTORY_FILE" 2>/dev/null || return 0
+}
+
+shiva_connectivity_ok() {
+  timeout "${SHIVA_CONNECT_TIMEOUT:-3}" bash -c '</dev/tcp/1.1.1.1/443' 2>/dev/null
+}
+
+shiva_dns_ok() {
+  getent hosts "${SHIVA_DNS_TEST_HOST:-example.com}" >/dev/null 2>&1
+}
+
+shiva_gateway_ok() {
+  ip route show default 2>/dev/null | grep -q '^default'
 }

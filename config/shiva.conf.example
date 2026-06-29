@@ -1,4 +1,4 @@
-# Shiva Toolkit v1.0.0 Stable global configuration.
+# Shiva Toolkit v1.1.0-dev Automation Preview global configuration.
 #
 # Host-specific checks are selected by:
 #   /etc/shiva/profiles/<hostname>.conf
@@ -34,6 +34,14 @@ SHIVA_DNS_TEST_HOST="example.com"
 
 # TCP connection timeout in seconds.
 SHIVA_CONNECT_TIMEOUT=3
+
+# Automation and repair.
+SHIVA_STATE_DIR="/var/lib/shiva"
+SHIVA_HISTORY_FILE="/var/lib/shiva/history.log"
+SHIVA_REPAIR_INTERFACE=""
+SHIVA_OPENVPN_SERVICE=""
+SHIVA_WATCHDOG_INTERVAL=60
+SHIVA_WATCHDOG_AUTO_REPAIR=false
 
 # Backup freshness check.
 SHIVA_BACKUP_DIR="/var/backups"

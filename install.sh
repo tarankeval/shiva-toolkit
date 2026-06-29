@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SHIVA_VERSION="1.0.0"
+SHIVA_VERSION="1.1.0-dev"
 PREFIX="${PREFIX:-/usr/local}"
 SYSCONFDIR="${SYSCONFDIR:-/etc}"
 ROOT="${DESTDIR:-}"
@@ -24,4 +24,4 @@ if [[ ! -e "$ROOT$SYSCONFDIR/shiva/shiva.conf" ]]; then
     "$ROOT$SYSCONFDIR/shiva/shiva.conf"
 fi
 
-printf 'Shiva Toolkit v%s Stable installed in %s\n' "$SHIVA_VERSION" "$ROOT$PREFIX"
+printf 'Shiva Toolkit v%s Automation Preview installed in %s\n' "$SHIVA_VERSION" "$ROOT$PREFIX"

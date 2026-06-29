@@ -1,0 +1,144 @@
+#!/usr/bin/env bash
+set -u
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../lib/shiva/bootstrap.sh" 2>/dev/null || source /usr/local/lib/shiva/bootstrap.sh
+shiva_load_common
+
+apply=false
+target=""
+
+usage() {
+  cat <<'EOF'
+Usage: shiva repair [--apply] <target>
+
+Targets:
+  network   Inspect and optionally restart the configured network interface
+  openvpn   Inspect and optionally restart the configured OpenVPN service
+  dns       Inspect and optionally restart the local resolver service
+
+By default this command runs in dry-run mode. Use --apply to execute repair
+actions that require root.
+EOF
+}
+
+while (($#)); do
+  case "$1" in
+    --apply) apply=true ;;
+    -h|--help|help) usage; exit 0 ;;
+    network|openvpn|dns) target="$1" ;;
+    *) printf 'Unknown repair option: %s\n' "$1" >&2; usage >&2; exit 1 ;;
+  esac
+  shift
+done
+
+if [[ -z "$target" ]]; then
+  usage >&2
+  exit 1
+fi
+
+run_action() {
+  local description="$1"
+  shift
+  if [[ "$apply" == true ]]; then
+    printf 'RUN  %s\n' "$description"
+    "$@"
+  else
+    printf 'PLAN %s\n' "$description"
+  fi
+}
+
+repair_network() {
+  local interface="$SHIVA_REPAIR_INTERFACE"
+  [[ -n "$interface" ]] || interface="${REQUIRED_INTERFACES%% *}"
+  [[ -n "$interface" ]] || interface="$(shiva_default_route_interface || true)"
+
+  shiva_title "SHIVA REPAIR NETWORK v$SHIVA_VERSION"
+  shiva_gateway_ok && shiva_status ok "Gateway" "OK" || shiva_status fail "Gateway" "FAILED"
+  shiva_connectivity_ok && shiva_status ok "Internet" "OK" || shiva_status fail "Internet" "FAILED"
+  shiva_dns_ok && shiva_status ok "DNS" "OK" || shiva_status fail "DNS" "FAILED"
+
+  if [[ -z "$interface" ]]; then
+    shiva_status warn "Interface" "NOT SELECTED"
+    printf '\nSet SHIVA_REPAIR_INTERFACE in the profile or config to enable restart.\n'
+    shiva_history_add repair warn "network repair skipped: no interface selected"
+    return 1
+  fi
+
+  if shiva_interface_exists "$interface"; then
+    shiva_status ok "Interface" "$interface"
+  else
+    shiva_status fail "Interface" "$interface missing"
+  fi
+
+  printf '\n'
+  if [[ "$apply" == true ]]; then
+    shiva_require_root || return 1
+  fi
+  run_action "bring $interface down" ip link set dev "$interface" down || return 1
+  run_action "bring $interface up" ip link set dev "$interface" up || return 1
+  shiva_history_add repair ok "network repair planned for $interface"
+}
+
+detect_openvpn_service() {
+  if [[ -n "$SHIVA_OPENVPN_SERVICE" ]]; then
+    printf '%s' "$SHIVA_OPENVPN_SERVICE"
+    return 0
+  fi
+  shiva_have systemctl || return 1
+  systemctl list-units --type=service --all --no-legend \
+    'openvpn-client@*.service' 'openvpn@*.service' 2>/dev/null |
+    awk '{print $1; exit}'
+}
+
+repair_openvpn() {
+  local service
+  service="$(detect_openvpn_service || true)"
+  shiva_title "SHIVA REPAIR OPENVPN v$SHIVA_VERSION"
+  state="$(shiva_openvpn_state)"
+  shiva_status "$(shiva_service_level "$state")" "OPENVPN" "$state"
+
+  if [[ -z "$service" ]]; then
+    shiva_status warn "Service" "NOT FOUND"
+    printf '\nSet SHIVA_OPENVPN_SERVICE in the profile or config to enable restart.\n'
+    shiva_history_add repair warn "openvpn repair skipped: no service selected"
+    return 1
+  fi
+
+  shiva_status ok "Service" "$service"
+  printf '\n'
+  if [[ "$apply" == true ]]; then
+    shiva_require_root || return 1
+  fi
+  run_action "restart $service" systemctl restart "$service" || return 1
+  shiva_history_add repair ok "openvpn repair planned for $service"
+}
+
+repair_dns() {
+  local service=""
+  shiva_title "SHIVA REPAIR DNS v$SHIVA_VERSION"
+  shiva_dns_ok && shiva_status ok "DNS" "OK" || shiva_status fail "DNS" "FAILED"
+
+  if shiva_have systemctl &&
+    systemctl list-unit-files systemd-resolved.service --no-legend 2>/dev/null | grep -q .; then
+    service="systemd-resolved"
+  fi
+
+  if [[ -z "$service" ]]; then
+    shiva_status warn "Resolver" "systemd-resolved not found"
+    shiva_history_add repair warn "dns repair skipped: resolver service not found"
+    return 1
+  fi
+
+  printf '\n'
+  if [[ "$apply" == true ]]; then
+    shiva_require_root || return 1
+  fi
+  run_action "restart $service" systemctl restart "$service" || return 1
+  shiva_history_add repair ok "dns repair planned for $service"
+}
+
+case "$target" in
+  network) repair_network ;;
+  openvpn) repair_openvpn ;;
+  dns) repair_dns ;;
+esac
