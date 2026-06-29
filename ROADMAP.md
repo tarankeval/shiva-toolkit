@@ -221,6 +221,9 @@ Initial implementation status:
   layer;
 - `shiva health --json` exposes health checks, summary counters, overall
   status, hostname, and profile from that shared engine;
+- JSON output now starts adopting a shared `schema: 1` field;
+- `shiva dashboard` renders its terminal and JSON output from Health Engine
+  data instead of collecting health state independently;
 - the existing human-readable `shiva health` output remains compatible.
 
 ## v1.3: Server Farm

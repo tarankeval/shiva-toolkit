@@ -41,6 +41,7 @@ grep -q 'By level' <<<"$history_summary"
 grep -q 'watchdog' <<<"$history_summary"
 
 health_json_output="$(NO_COLOR=1 "$PROJECT_DIR/bin/shiva-health" --json || true)"
+grep -q '"schema":1' <<<"$health_json_output"
 grep -q '"overall":' <<<"$health_json_output"
 grep -q '"checks":\[' <<<"$health_json_output"
 grep -q '"key":"dns"' <<<"$health_json_output"
@@ -95,22 +96,23 @@ dashboard_output="$(
   NO_COLOR=1 SHIVA_HISTORY_FILE="$history_file" \
     SHIVA_NODES="local:server:localhost vpn:VPN:shiva-vpn" \
     SHIVA_WATCHDOG_STATE_FILE="$state_file" \
-    "$PROJECT_DIR/bin/shiva-dashboard" 10
+    "$PROJECT_DIR/bin/shiva-dashboard"
 )"
 grep -q 'SHIVA DASHBOARD' <<<"$dashboard_output"
+grep -q 'Health' <<<"$dashboard_output"
 grep -q 'Watchdog' <<<"$dashboard_output"
-grep -q 'Service' <<<"$dashboard_output"
 grep -q 'Nodes' <<<"$dashboard_output"
-grep -q 'Recent failures' <<<"$dashboard_output"
+grep -q 'Attention' <<<"$dashboard_output"
 
 dashboard_json="$(
   NO_COLOR=1 SHIVA_HISTORY_FILE="$history_file" \
     SHIVA_NODES="local:server:localhost vpn:VPN:shiva-vpn" \
     SHIVA_WATCHDOG_STATE_FILE="$state_file" \
-    "$PROJECT_DIR/bin/shiva-dashboard" --json 10
+    "$PROJECT_DIR/bin/shiva-dashboard" --json
 )"
-grep -q '"failures":3' <<<"$dashboard_json"
-grep -q '"service":' <<<"$dashboard_json"
+grep -q '"schema":1' <<<"$dashboard_json"
+grep -q '"source":"health-engine"' <<<"$dashboard_json"
+grep -q '"health_percent":' <<<"$dashboard_json"
 grep -q '"nodes":2' <<<"$dashboard_json"
 grep -q '"telegram":"disabled"' <<<"$dashboard_json"
 
@@ -118,10 +120,10 @@ dashboard_watch_output="$(
   NO_COLOR=1 SHIVA_HISTORY_FILE="$history_file" \
     SHIVA_NODES="local:server:localhost vpn:VPN:shiva-vpn" \
     SHIVA_WATCHDOG_STATE_FILE="$state_file" \
-    "$PROJECT_DIR/bin/shiva-dashboard" --watch --interval 0 --count 1 10
+    "$PROJECT_DIR/bin/shiva-dashboard" --watch --interval 0 --count 1
 )"
 grep -q 'Refresh' <<<"$dashboard_watch_output"
-grep -q 'Recent failures' <<<"$dashboard_watch_output"
+grep -q 'Attention' <<<"$dashboard_watch_output"
 
 repair_history="$stage/repair-history.log"
 repair_output="$(

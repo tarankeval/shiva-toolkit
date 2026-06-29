@@ -5,6 +5,7 @@ set -o pipefail
 SHIVA_VERSION="1.1.0-dev"
 SHIVA_RELEASE="Automation Preview"
 SHIVA_PRODUCT="Shiva Toolkit"
+SHIVA_JSON_SCHEMA=1
 SHIVA_CONFIG="${SHIVA_CONFIG:-/etc/shiva/shiva.conf}"
 SHIVA_PROFILE_DIR="${SHIVA_PROFILE_DIR:-/etc/shiva/profiles}"
 SHIVA_BUILTIN_PROFILE_DIR="${SHIVA_BUILTIN_PROFILE_DIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/profiles}"

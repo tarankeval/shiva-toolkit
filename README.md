@@ -112,8 +112,8 @@ so watchdog and health checks do not report `OPENVPN NOT INSTALLED`.
 
 `shiva health --json` is the first hardening step toward a shared Health
 Engine. It exposes the same checks as the terminal health summary in a stable
-machine-readable shape for future dashboard, advisor, cluster, and notification
-integrations.
+machine-readable shape with `schema: 1`. `shiva dashboard` now reads the same
+engine snapshot instead of collecting health state independently.
 
 The watchdog is installed with a systemd unit:
 

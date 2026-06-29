@@ -27,6 +27,7 @@ grep -q 'cluster  Show compact infrastructure overview' <<<"$help_output"
 grep -q 'log      Show module logs' <<<"$help_output"
 NO_COLOR=1 "$PROJECT_DIR/bin/shiva-doctor" >/dev/null || [[ $? -eq 2 ]]
 health_json_output="$(NO_COLOR=1 "$PROJECT_DIR/bin/shiva-health" --json || true)"
+grep -q '"schema":1' <<<"$health_json_output"
 grep -q '"checks":\[' <<<"$health_json_output"
 grep -q '"health_percent":' <<<"$health_json_output"
 NO_COLOR=1 SHIVA_STATE_DIR="$stage/state" \
