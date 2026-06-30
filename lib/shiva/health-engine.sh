@@ -144,10 +144,5 @@ shiva_health_engine_collect() {
 }
 
 shiva_health_engine_json_escape() {
-  local value="$1"
-  value="${value//\\/\\\\}"
-  value="${value//\"/\\\"}"
-  value="${value//$'\n'/\\n}"
-  value="${value//$'\t'/\\t}"
-  printf '%s' "$value"
+  shiva_json_escape "$1"
 }

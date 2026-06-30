@@ -58,6 +58,8 @@ log_dns_json="$(
   NO_COLOR=1 SHIVA_HISTORY_FILE="$history_file" \
     "$PROJECT_DIR/bin/shiva-log" dns --json 10
 )"
+grep -q '"schema":1' <<<"$log_dns_json"
+grep -q '"source":"log"' <<<"$log_dns_json"
 grep -q '"target":"dns"' <<<"$log_dns_json"
 grep -q '"DNS failed"' <<<"$log_dns_json"
 ! grep -q 'OpenVPN disconnected' <<<"$log_dns_json"
@@ -85,6 +87,8 @@ advisor_json="$(
 grep -q '"history_window":10' <<<"$advisor_json"
 grep -q '"schema":1' <<<"$advisor_json"
 grep -q '"source":"health-engine"' <<<"$advisor_json"
+grep -q '"health_percent":' <<<"$advisor_json"
+grep -q '"checks":\[' <<<"$advisor_json"
 grep -q '"recommendations":\[' <<<"$advisor_json"
 grep -q '"level":"CRITICAL"\|"level":"RECOMMENDED"\|"level":"INFO"' <<<"$advisor_json"
 
@@ -199,6 +203,8 @@ doctor_state_json="$(
     SHIVA_NOTIFY_STATE_DIR="$stage/state-json/notify" \
     "$PROJECT_DIR/bin/shiva-doctor" state --json
 )"
+grep -q '"schema":1' <<<"$doctor_state_json"
+grep -q '"source":"doctor-state"' <<<"$doctor_state_json"
 grep -q '"issues":0' <<<"$doctor_state_json"
 grep -q '"files":\[' <<<"$doctor_state_json"
 
@@ -213,6 +219,8 @@ doctor_config_json="$(
   NO_COLOR=1 SHIVA_NODES="local:server:localhost" \
     "$PROJECT_DIR/bin/shiva-doctor" config --json || true
 )"
+grep -q '"schema":1' <<<"$doctor_config_json"
+grep -q '"source":"doctor-config"' <<<"$doctor_config_json"
 grep -q '"profile":' <<<"$doctor_config_json"
 grep -q '"nodes":1' <<<"$doctor_config_json"
 
@@ -225,6 +233,8 @@ grep -q 'Release readiness' <<<"$doctor_release_output"
 doctor_release_json="$(
   NO_COLOR=1 "$PROJECT_DIR/bin/shiva-doctor" release --json
 )"
+grep -q '"schema":1' <<<"$doctor_release_json"
+grep -q '"source":"doctor-release"' <<<"$doctor_release_json"
 grep -q '"issues":0' <<<"$doctor_release_json"
 grep -q '"status":"ok"' <<<"$doctor_release_json"
 grep -q '"README release doctor"' <<<"$doctor_release_json"
@@ -250,6 +260,8 @@ nodes_json="$(
   NO_COLOR=1 SHIVA_NODES="local:server:localhost vpn:VPN:shiva-vpn" \
     "$PROJECT_DIR/bin/shiva-nodes" --json
 )"
+grep -q '"schema":1' <<<"$nodes_json"
+grep -q '"source":"nodes"' <<<"$nodes_json"
 grep -q '"nodes":\[' <<<"$nodes_json"
 grep -q '"name":"vpn"' <<<"$nodes_json"
 

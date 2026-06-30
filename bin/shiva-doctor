@@ -11,7 +11,9 @@ show_state_diagnostics() {
   fi
 
   if [[ "$json" == true ]]; then
-    printf '{"paths":['
+    printf '{'
+    shiva_json_metadata "doctor-state" "diagnostic" "null"
+    printf '"checks":[],"paths":['
   else
     shiva_title "SHIVA DOCTOR STATE"
   fi
@@ -84,12 +86,7 @@ show_state_diagnostics() {
 }
 
 json_escape() {
-  local value="$1"
-  value="${value//\\/\\\\}"
-  value="${value//\"/\\\"}"
-  value="${value//$'\n'/\\n}"
-  value="${value//$'\t'/\\t}"
-  printf '%s' "$value"
+  shiva_json_escape "$1"
 }
 
 show_config_diagnostics() {
@@ -120,6 +117,7 @@ show_config_diagnostics() {
 
   if [[ "$json" == true ]]; then
     printf '{'
+    shiva_json_metadata "doctor-config" "$([[ "$issues" -eq 0 ]] && printf ok || printf fail)" "null"
     printf '"hostname":"%s",' "$(json_escape "$SHIVA_HOSTNAME")"
     printf '"profile":"%s",' "$(json_escape "$SHIVA_PROFILE_NAME")"
     printf '"profile_source":"%s",' "$(json_escape "$SHIVA_PROFILE_SOURCE")"
@@ -226,6 +224,7 @@ show_release_diagnostics() {
 
   check_release_file "README" "README.md"
   check_release_file "Roadmap" "ROADMAP.md"
+  check_release_file "Changelog" "CHANGELOG.md"
   check_release_file "Debian control" "debian/control"
   check_release_file "Build script" "packaging/build-deb.sh"
   check_release_file "Installer" "install.sh"
@@ -245,7 +244,16 @@ show_release_diagnostics() {
   check_release_text "README release doctor" "README.md" "shiva doctor release" "documented"
 
   if [[ "$json" == true ]]; then
-    printf '{"checks":%s,"issues":%s,"status":"%s","items":[' "$checks" "$issues" "$([[ "$issues" -eq 0 ]] && printf ok || printf fail)"
+    printf '{'
+    shiva_json_metadata "doctor-release" "$([[ "$issues" -eq 0 ]] && printf ok || printf fail)" "null"
+    printf '"check_count":%s,"issues":%s,"status":"%s","checks":[' "$checks" "$issues" "$([[ "$issues" -eq 0 ]] && printf ok || printf fail)"
+    for detail in "${json_entries[@]}"; do
+      [[ "$first" == true ]] || printf ','
+      first=false
+      printf '%s' "$detail"
+    done
+    printf '],"items":['
+    first=true
     for detail in "${json_entries[@]}"; do
       [[ "$first" == true ]] || printf ','
       first=false

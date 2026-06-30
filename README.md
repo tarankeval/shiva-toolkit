@@ -53,9 +53,9 @@ shiva-backup      Backup freshness check
 The same modules can also be called as subcommands, for example
 `shiva health` and `shiva network`.
 
-## Automation preview
+## Automation stable candidate
 
-The `v1.1` development branch introduces the first automation commands:
+The `v1.1` branch introduces the first automation commands:
 
 ```bash
 shiva repair status
@@ -115,6 +115,25 @@ so watchdog and health checks do not report `OPENVPN NOT INSTALLED`.
 Engine. It exposes the same checks as the terminal health summary in a stable
 machine-readable shape with `schema: 1`. `shiva dashboard` now reads the same
 engine snapshot instead of collecting health state independently.
+
+JSON-producing commands are being aligned around this common envelope:
+
+```json
+{
+  "schema": 1,
+  "version": "1.1.0-dev",
+  "hostname": "shiva-server",
+  "profile": "shiva-server",
+  "source": "health-engine",
+  "overall": "excellent",
+  "health_percent": 100,
+  "checks": []
+}
+```
+
+Commands that do not represent health directly use `health_percent: null` and
+keep their domain-specific arrays, for example `nodes`, `entries`, or
+`recommendations`.
 
 The watchdog is installed with a systemd unit:
 

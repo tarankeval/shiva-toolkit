@@ -24,12 +24,7 @@ while (($#)); do
 done
 
 json_escape() {
-  local value="$1"
-  value="${value//\\/\\\\}"
-  value="${value//\"/\\\"}"
-  value="${value//$'\n'/\\n}"
-  value="${value//$'\t'/\\t}"
-  printf '%s' "$value"
+  shiva_json_escape "$1"
 }
 
 node_status() {
@@ -42,7 +37,9 @@ node_status() {
 }
 
 if [[ "$json" == true ]]; then
-  printf '{"nodes":['
+  printf '{'
+  shiva_json_metadata "nodes" "ok" "null"
+  printf '"checks":[],"nodes":['
   separator=""
   for entry in $SHIVA_NODES; do
     IFS=':' read -r name role host extra <<<"$entry"

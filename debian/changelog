@@ -2,6 +2,8 @@ shiva-toolkit (1.1.0~dev-1) unstable; urgency=medium
 
   * Start v1.1 automation development.
   * Add guided repair, watchdog, and history command scaffolds.
+  * Add Health Engine, dashboard, advisor, notify, service, nodes, cluster,
+    release diagnostics, schema-versioned JSON, and explicit watchdog modes.
 
  -- Taran Keval Singh <231631186+tarankeval@users.noreply.github.com>  Mon, 29 Jun 2026 00:00:00 +0200
 

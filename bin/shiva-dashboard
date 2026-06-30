@@ -105,13 +105,7 @@ collect_dashboard_state() {
 
 render_dashboard_json() {
   printf '{'
-  printf '"schema":%s,' "$SHIVA_JSON_SCHEMA"
-  printf '"version":"%s",' "$(json_escape "$SHIVA_VERSION")"
-  printf '"hostname":"%s",' "$(json_escape "$SHIVA_HOSTNAME")"
-  printf '"profile":"%s",' "$(json_escape "$SHIVA_PROFILE_NAME")"
-  printf '"source":"health-engine",'
-  printf '"overall":"%s",' "$overall"
-  printf '"health_percent":%s,' "$health_percent"
+  shiva_json_metadata "health-engine" "$overall" "$health_percent"
   printf '"passed":%s,' "$passed"
   printf '"warnings":%s,' "$warnings"
   printf '"failures":%s,' "$failures"

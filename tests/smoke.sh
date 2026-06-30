@@ -35,7 +35,9 @@ NO_COLOR=1 SHIVA_STATE_DIR="$stage/state" \
   SHIVA_WATCHDOG_STATE_FILE="$stage/state/watchdog.state" \
   SHIVA_NOTIFY_STATE_DIR="$stage/state/notify" \
   "$PROJECT_DIR/bin/shiva-doctor" state >/dev/null
-NO_COLOR=1 "$PROJECT_DIR/bin/shiva-doctor" release --json >/dev/null
+doctor_release_json="$(NO_COLOR=1 "$PROJECT_DIR/bin/shiva-doctor" release --json)"
+grep -q '"schema":1' <<<"$doctor_release_json"
+grep -q '"source":"doctor-release"' <<<"$doctor_release_json"
 NO_COLOR=1 SHIVA_HISTORY_FILE="$stage_history" "$PROJECT_DIR/bin/shiva-history" >/dev/null
 NO_COLOR=1 "$PROJECT_DIR/bin/shiva-repair" --help >/dev/null
 NO_COLOR=1 "$PROJECT_DIR/bin/shiva-watchdog" --help >/dev/null

@@ -20,12 +20,7 @@ EOF
 }
 
 json_escape() {
-  local value="$1"
-  value="${value//\\/\\\\}"
-  value="${value//\"/\\\"}"
-  value="${value//$'\n'/\\n}"
-  value="${value//$'\t'/\\t}"
-  printf '%s' "$value"
+  shiva_json_escape "$1"
 }
 
 while (($#)); do
@@ -70,7 +65,9 @@ fi
 
 if [[ ! -r "$SHIVA_HISTORY_FILE" ]]; then
   if [[ "$json" == true ]]; then
-    printf '{"target":"%s","entries":[],"history_file":"%s"}\n' \
+    printf '{'
+    shiva_json_metadata "log" "ok" "null"
+    printf '"checks":[],"target":"%s","entries":[],"history_file":"%s"}\n' \
       "$(json_escape "$target")" "$(json_escape "$SHIVA_HISTORY_FILE")"
   else
     shiva_title "SHIVA LOG ${target^^}"
@@ -99,7 +96,9 @@ awk -F '\t' -v target="$target" -v level_filter="$level_filter" '
   tail -n "$limit" >"$log_tmp"
 
 if [[ "$json" == true ]]; then
-  printf '{"target":"%s","entries":[' "$(json_escape "$target")"
+  printf '{'
+  shiva_json_metadata "log" "ok" "null"
+  printf '"checks":[],"target":"%s","entries":[' "$(json_escape "$target")"
   awk -F '\t' '
     function esc(value) {
       gsub(/\\/,"\\\\",value)

@@ -62,13 +62,26 @@ json_escape() {
 print_json() {
   local index
   printf '{'
-  printf '"schema":%s,' "$SHIVA_JSON_SCHEMA"
-  printf '"version":"%s",' "$(json_escape "$SHIVA_VERSION")"
-  printf '"source":"health-engine",'
+  shiva_json_metadata "health-engine" "$overall" "$health_percent"
   printf '"history_window":%s,' "$limit"
   printf '"failures":%s,' "$fail_count"
   printf '"warnings":%s,' "$warn_count"
   printf '"watchdog_state":"%s",' "$(json_escape "$state")"
+  printf '"checks":['
+  awk -F '\t' '
+    function esc(value) {
+      gsub(/\\/,"\\\\",value)
+      gsub(/"/,"\\\"",value)
+      gsub(/\t/,"\\t",value)
+      return value
+    }
+    {
+      if (count > 0) printf ","
+      printf "{\"level\":\"%s\",\"key\":\"%s\",\"label\":\"%s\",\"value\":\"%s\"}", esc($1), esc($2), esc($3), esc($4)
+      count += 1
+    }
+  ' "$health_tmp"
+  printf '],'
   printf '"recommendations":['
   for index in "${!recommendation_messages[@]}"; do
     (( index > 0 )) && printf ','
@@ -108,8 +121,22 @@ notify_recommendations() {
 }
 
 shiva_health_engine_collect >"$health_tmp"
+passed="$(awk -F '\t' '$1 == "ok" {count += 1} END {print count + 0}' "$health_tmp")"
 fail_count="$(awk -F '\t' '$1 == "fail" {count += 1} END {print count + 0}' "$health_tmp")"
 warn_count="$(awk -F '\t' '$1 == "warn" {count += 1} END {print count + 0}' "$health_tmp")"
+total=$((passed + warn_count + fail_count))
+if (( total > 0 )); then
+  health_percent=$(((passed * 100 + warn_count * 50) / total))
+else
+  health_percent=0
+fi
+if (( fail_count > 0 )); then
+  overall="attention_required"
+elif (( warn_count > 0 )); then
+  overall="good_with_warnings"
+else
+  overall="excellent"
+fi
 history_fail_count="$(history_count fail)"
 history_warn_count="$(history_count warn)"
 state="$(watchdog_state || true)"

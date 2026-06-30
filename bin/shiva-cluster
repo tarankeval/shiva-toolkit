@@ -68,10 +68,7 @@ telegram="$(dashboard_value telegram)"
 
 if [[ "$json" == true ]]; then
   printf '{'
-  printf '"schema":%s,' "$SHIVA_JSON_SCHEMA"
-  printf '"version":"%s",' "$(json_escape "$SHIVA_VERSION")"
-  printf '"hostname":"%s",' "$(json_escape "$SHIVA_HOSTNAME")"
-  printf '"source":"health-engine",'
+  shiva_json_metadata "health-engine" "$overall" "$health_percent"
   printf '"nodes":%s,' "$node_total"
   printf '"local_nodes":%s,' "$node_local"
   printf '"configured_nodes":%s,' "$node_configured"

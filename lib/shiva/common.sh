@@ -116,6 +116,26 @@ shiva_status() {
   printf '%s %s%-18s%s %s\n' "$icon" "$color" "$label" "$SHIVA_RESET" "$value"
 }
 
+shiva_json_escape() {
+  local value="$1"
+  value="${value//\\/\\\\}"
+  value="${value//\"/\\\"}"
+  value="${value//$'\n'/\\n}"
+  value="${value//$'\t'/\\t}"
+  printf '%s' "$value"
+}
+
+shiva_json_metadata() {
+  local source="$1" overall="$2" health_percent="$3"
+  printf '"schema":%s,' "$SHIVA_JSON_SCHEMA"
+  printf '"version":"%s",' "$(shiva_json_escape "$SHIVA_VERSION")"
+  printf '"hostname":"%s",' "$(shiva_json_escape "$SHIVA_HOSTNAME")"
+  printf '"profile":"%s",' "$(shiva_json_escape "$SHIVA_PROFILE_NAME")"
+  printf '"source":"%s",' "$(shiva_json_escape "$source")"
+  printf '"overall":"%s",' "$(shiva_json_escape "$overall")"
+  printf '"health_percent":%s,' "$health_percent"
+}
+
 shiva_have() {
   command -v "$1" >/dev/null 2>&1
 }
