@@ -40,11 +40,23 @@ grep -q 'Total: 5' <<<"$history_summary"
 grep -q 'By level' <<<"$history_summary"
 grep -q 'watchdog' <<<"$history_summary"
 
+history_date_json="$(
+  NO_COLOR=1 SHIVA_HISTORY_FILE="$history_file" \
+    "$PROJECT_DIR/bin/shiva-history" --json --date 2026-06-25 --level ERROR --service openvpn 10
+)"
+grep -q '"schema":1' <<<"$history_date_json"
+grep -q '"source":"history"' <<<"$history_date_json"
+grep -q '"OpenVPN disconnected"' <<<"$history_date_json"
+! grep -q 'DNS failed' <<<"$history_date_json"
+
 health_json_output="$(NO_COLOR=1 "$PROJECT_DIR/bin/shiva-health" --json || true)"
 grep -q '"schema":1' <<<"$health_json_output"
 grep -q '"overall":' <<<"$health_json_output"
 grep -q '"checks":\[' <<<"$health_json_output"
 grep -q '"key":"dns"' <<<"$health_json_output"
+grep -q '"key":"uptime"' <<<"$health_json_output"
+grep -q '"key":"load_average"' <<<"$health_json_output"
+grep -q '"key":"root_free"' <<<"$health_json_output"
 
 log_watchdog_output="$(
   NO_COLOR=1 SHIVA_HISTORY_FILE="$history_file" \
@@ -103,6 +115,7 @@ dashboard_output="$(
   NO_COLOR=1 SHIVA_HISTORY_FILE="$history_file" \
     SHIVA_NODES="local:server:localhost vpn:VPN:shiva-vpn" \
     SHIVA_WATCHDOG_STATE_FILE="$state_file" \
+    SHIVA_DASHBOARD_SNAPSHOT_FILE="$stage/dashboard.json" \
     "$PROJECT_DIR/bin/shiva-dashboard"
 )"
 grep -q 'SHIVA DASHBOARD' <<<"$dashboard_output"
@@ -110,11 +123,25 @@ grep -q 'Health' <<<"$dashboard_output"
 grep -q 'Watchdog' <<<"$dashboard_output"
 grep -q 'Nodes' <<<"$dashboard_output"
 grep -q 'Attention' <<<"$dashboard_output"
+grep -q 'Uptime' <<<"$dashboard_output"
+grep -q 'Load average' <<<"$dashboard_output"
+grep -q 'Root free' <<<"$dashboard_output"
+test -r "$stage/dashboard.json"
+grep -q '"recent_warnings":' "$stage/dashboard.json"
+
+dashboard_compact_output="$(
+  NO_COLOR=1 SHIVA_HISTORY_FILE="$history_file" \
+    SHIVA_DASHBOARD_SNAPSHOT_FILE="$stage/dashboard-compact.json" \
+    "$PROJECT_DIR/bin/shiva-dashboard" --compact
+)"
+grep -q 'SHIVA DASHBOARD' <<<"$dashboard_compact_output"
+! grep -q 'Attention' <<<"$dashboard_compact_output"
 
 dashboard_json="$(
   NO_COLOR=1 SHIVA_HISTORY_FILE="$history_file" \
     SHIVA_NODES="local:server:localhost vpn:VPN:shiva-vpn" \
     SHIVA_WATCHDOG_STATE_FILE="$state_file" \
+    SHIVA_DASHBOARD_SNAPSHOT_FILE="$stage/dashboard-json.json" \
     "$PROJECT_DIR/bin/shiva-dashboard" --json
 )"
 grep -q '"schema":1' <<<"$dashboard_json"
@@ -122,6 +149,12 @@ grep -q '"source":"health-engine"' <<<"$dashboard_json"
 grep -q '"health_percent":' <<<"$dashboard_json"
 grep -q '"nodes":2' <<<"$dashboard_json"
 grep -q '"telegram":"disabled"' <<<"$dashboard_json"
+grep -q '"updated_at":' <<<"$dashboard_json"
+grep -q '"uptime":' <<<"$dashboard_json"
+grep -q '"load_average":' <<<"$dashboard_json"
+grep -q '"root_free":' <<<"$dashboard_json"
+grep -q '"recent_warnings":' <<<"$dashboard_json"
+test -r "$stage/dashboard-json.json"
 
 dashboard_watch_output="$(
   NO_COLOR=1 SHIVA_HISTORY_FILE="$history_file" \
@@ -175,6 +208,12 @@ notify_status="$(
 )"
 grep -q 'Telegram' <<<"$notify_status"
 grep -q 'Cooldown' <<<"$notify_status"
+
+NO_COLOR=1 SHIVA_HISTORY_FILE="$history_file" \
+  SHIVA_NOTIFY_STATE_DIR="$stage/notify" \
+  SHIVA_TELEGRAM_ENABLED=false \
+  "$PROJECT_DIR/bin/shiva-notify" test >/dev/null
+grep -q 'notification skipped: telegram disabled' "$history_file"
 
 readonly_history_dir="$stage/readonly-history"
 mkdir -p "$readonly_history_dir"
@@ -287,6 +326,17 @@ grep -q '"nodes":2' <<<"$cluster_json"
 grep -q '"configured_nodes":1' <<<"$cluster_json"
 grep -q '"watchdog":' <<<"$cluster_json"
 
+cat >"$stage/dashboard-snapshot.json" <<'EOF'
+{"schema":1,"version":"test","hostname":"snapshot","profile":"snapshot","source":"health-engine","overall":"excellent","health_percent":100,"failures":0,"warnings":0,"watchdog":"ok","telegram":"disabled","checks":[]}
+EOF
+cluster_snapshot_json="$(
+  NO_COLOR=1 SHIVA_DASHBOARD_SNAPSHOT_FILE="$stage/dashboard-snapshot.json" \
+    SHIVA_NODES="local:server:localhost vpn:VPN:shiva-vpn" \
+    "$PROJECT_DIR/bin/shiva-cluster" --json
+)"
+grep -q '"health_percent":100' <<<"$cluster_snapshot_json"
+grep -q '"watchdog":"ok"' <<<"$cluster_snapshot_json"
+
 printf 'ok\n' >"$state_file"
 NO_COLOR=1 SHIVA_WATCHDOG_STATE_FILE="$state_file" \
   "$PROJECT_DIR/bin/shiva-watchdog" --status >/dev/null
@@ -296,6 +346,8 @@ watchdog_config="$(
     "$PROJECT_DIR/bin/shiva-watchdog" --config
 )"
 grep -q 'Interval' <<<"$watchdog_config"
+grep -q 'Failure threshold' <<<"$watchdog_config"
+grep -q 'Metadata file' <<<"$watchdog_config"
 grep -q 'Auto repair' <<<"$watchdog_config"
 grep -q 'Repair targets' <<<"$watchdog_config"
 
@@ -306,9 +358,12 @@ grep -q -- '--watch' <<<"$watchdog_help"
 
 watchdog_watch_output="$(
   NO_COLOR=1 SHIVA_WATCHDOG_INTERVAL=1 SHIVA_WATCHDOG_STATE_FILE="$state_file" \
+    SHIVA_WATCHDOG_META_FILE="$stage/watchdog.json" \
     timeout 2 "$PROJECT_DIR/bin/shiva-watchdog" --watch 2>/dev/null || true
 )"
 grep -q 'Press Ctrl+C to stop' <<<"$watchdog_watch_output"
+test -r "$stage/watchdog.json"
+grep -q '"consecutive_failures":' "$stage/watchdog.json"
 
 printf 'fail:3\n' >"$state_file"
 if NO_COLOR=1 SHIVA_WATCHDOG_STATE_FILE="$state_file" \

@@ -44,7 +44,11 @@ node_counts() {
   printf '%s %s %s' "$total" "$local_count" "$configured_count"
 }
 
-dashboard_json="$("$SCRIPT_DIR/shiva-dashboard" --json 2>/dev/null || true)"
+if [[ -r "$SHIVA_DASHBOARD_SNAPSHOT_FILE" ]]; then
+  dashboard_json="$(<"$SHIVA_DASHBOARD_SNAPSHOT_FILE")"
+else
+  dashboard_json="$("$SCRIPT_DIR/shiva-dashboard" --json 2>/dev/null || true)"
+fi
 dashboard_value() {
   local key="$1"
   sed -n "s/.*\"$key\":\\([^,}]*\\).*/\\1/p" <<<"$dashboard_json" |

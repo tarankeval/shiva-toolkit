@@ -75,15 +75,19 @@ shiva watchdog --status
 shiva watchdog --config
 shiva history
 shiva history --summary
+shiva history --json --date 2026-06-25
 shiva history --module watchdog
-shiva history --level fail
+shiva history --level ERROR
+shiva history --service openvpn
 shiva advisor
 shiva advisor --json
 shiva advisor --notify
 shiva dashboard
 shiva dashboard --json
+shiva dashboard --compact
 shiva dashboard --watch --interval 5
 shiva notify status
+shiva notify test
 shiva notify --dry-run "test message"
 shiva service status
 shiva service --apply enable
@@ -134,6 +138,16 @@ JSON-producing commands are being aligned around this common envelope:
 Commands that do not represent health directly use `health_percent: null` and
 keep their domain-specific arrays, for example `nodes`, `entries`, or
 `recommendations`.
+
+`shiva dashboard` stores the latest dashboard snapshot in:
+
+```text
+/var/lib/shiva/dashboard.json
+```
+
+Override this path with `SHIVA_DASHBOARD_SNAPSHOT_FILE` for tests or custom
+deployments. `shiva cluster` reads this snapshot first and only falls back to a
+fresh dashboard collection when no snapshot exists.
 
 The watchdog is installed with a systemd unit:
 

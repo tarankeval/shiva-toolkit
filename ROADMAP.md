@@ -226,6 +226,13 @@ Initial implementation status:
   data instead of collecting health state independently;
 - `shiva cluster` reads local state from the Health Engine-backed dashboard
   snapshot, so Watchdog status is consistent between dashboard and cluster;
+- `shiva dashboard` includes update time, uptime, load average, free root
+  space, recent warning counts, compact mode, and a reusable JSON snapshot;
+- `shiva history` supports JSON output, date filtering, INFO/WARNING/ERROR
+  level aliases, and service/message search;
+- `shiva notify test` exercises configured notification delivery;
+- `shiva-watchdog` writes JSON metadata with last successful cycle and
+  consecutive failure count;
 - `shiva advisor` uses Health Engine checks and labels recommendations as
   INFO, RECOMMENDED, or CRITICAL;
 - `shiva-watchdog` now has explicit `--once` and `--watch` modes, and the

@@ -6,12 +6,14 @@ shiva_load_common
 
 dry_run=false
 status_only=false
+test_only=false
 category="default"
 
 usage() {
   cat <<'EOF'
 Usage: shiva notify [--dry-run] [--category name] <message>
        shiva notify status
+       shiva notify test
 
 Send a configured Shiva Toolkit notification. Telegram is disabled by default.
 EOF
@@ -34,6 +36,7 @@ while (($#)); do
       shift
       ;;
     status) status_only=true; shift ;;
+    test) test_only=true; category="test"; shift ;;
     -h|--help|help) usage; exit 0 ;;
     *) break ;;
   esac
@@ -65,7 +68,11 @@ if [[ "$status_only" == true ]]; then
   exit 0
 fi
 
-message="$*"
+if [[ "$test_only" == true ]]; then
+  message="Shiva Toolkit test notification from $SHIVA_HOSTNAME"
+else
+  message="$*"
+fi
 if [[ -z "$message" ]]; then
   usage >&2
   exit 1

@@ -6,6 +6,7 @@ shiva_load_common
 
 json=false
 watch=false
+compact=false
 interval="${SHIVA_DASHBOARD_INTERVAL:-5}"
 count=0
 health_tmp="$(mktemp "${TMPDIR:-/tmp}/shiva-dashboard.XXXXXX")" || exit 1
@@ -13,7 +14,7 @@ trap 'rm -f "$health_tmp"' EXIT
 
 usage() {
   cat <<'EOF'
-Usage: shiva dashboard [--json] [--watch] [--interval seconds] [--count cycles]
+Usage: shiva dashboard [--json] [--compact] [--watch] [--interval seconds] [--count cycles]
 
 Show a compact operational dashboard from the shared Shiva Health Engine.
 EOF
@@ -22,6 +23,7 @@ EOF
 while (($#)); do
   case "$1" in
     --json) json=true ;;
+    --compact) compact=true ;;
     --watch) watch=true ;;
     --interval)
       shift
@@ -81,6 +83,17 @@ watchdog_state() {
   cat "$SHIVA_WATCHDOG_STATE_FILE"
 }
 
+check_value() {
+  local key="$1"
+  awk -F '\t' -v key="$key" '$2 == key {print $4; exit}' "$health_tmp"
+}
+
+history_warning_count() {
+  [[ -r "$SHIVA_HISTORY_FILE" ]] || { printf '0'; return 0; }
+  tail -n "${SHIVA_DASHBOARD_HISTORY_LINES:-50}" "$SHIVA_HISTORY_FILE" |
+    awk -F '\t' '$2 == "warn" || $2 == "fail" {count += 1} END {print count + 0}'
+}
+
 collect_dashboard_state() {
   shiva_health_engine_collect >"$health_tmp"
   passed="$(awk -F '\t' '$1 == "ok" {count += 1} END {print count + 0}' "$health_tmp")"
@@ -101,6 +114,11 @@ collect_dashboard_state() {
   fi
   nodes="$(node_count)"
   watchdog="$(watchdog_state)"
+  updated_at="$(check_value updated_at)"
+  uptime="$(check_value uptime)"
+  load_average="$(check_value load_average)"
+  root_free="$(check_value root_free)"
+  recent_warnings="$(history_warning_count)"
 }
 
 render_dashboard_json() {
@@ -111,6 +129,11 @@ render_dashboard_json() {
   printf '"failures":%s,' "$failures"
   printf '"nodes":%s,' "$nodes"
   printf '"watchdog":"%s",' "$(json_escape "$watchdog")"
+  printf '"updated_at":"%s",' "$(json_escape "$updated_at")"
+  printf '"uptime":"%s",' "$(json_escape "$uptime")"
+  printf '"load_average":"%s",' "$(json_escape "$load_average")"
+  printf '"root_free":"%s",' "$(json_escape "$root_free")"
+  printf '"recent_warnings":%s,' "$recent_warnings"
   if shiva_enabled "$SHIVA_TELEGRAM_ENABLED"; then
     printf '"telegram":"enabled",'
   else
@@ -133,6 +156,18 @@ render_dashboard_json() {
   printf ']}\n'
 }
 
+write_dashboard_snapshot() {
+  local dir tmp_file
+  dir="$(dirname -- "$SHIVA_DASHBOARD_SNAPSHOT_FILE")"
+  mkdir -p "$dir" 2>/dev/null || return 0
+  tmp_file="$dir/.dashboard.$$"
+  { render_dashboard_json >"$tmp_file"; } 2>/dev/null &&
+    { mv "$tmp_file" "$SHIVA_DASHBOARD_SNAPSHOT_FILE"; } 2>/dev/null || {
+      rm -f "$tmp_file" 2>/dev/null || true
+      return 0
+    }
+}
+
 render_dashboard_text() {
   shiva_title "SHIVA DASHBOARD v$SHIVA_VERSION"
 
@@ -146,6 +181,10 @@ render_dashboard_text() {
     *) shiva_status fail "Health" "${health_percent}%" ;;
   esac
 
+  [[ -n "$updated_at" ]] && shiva_status ok "Updated" "$updated_at"
+  [[ -n "$uptime" ]] && shiva_status ok "Uptime" "$uptime"
+  [[ -n "$load_average" ]] && shiva_status ok "Load average" "$load_average"
+  [[ -n "$root_free" ]] && shiva_status ok "Root free" "$root_free"
   shiva_status ok "Passed" "$passed"
   if (( warnings > 0 )); then
     shiva_status warn "Warnings" "$warnings"
@@ -157,6 +196,7 @@ render_dashboard_text() {
   else
     shiva_status ok "Failures" "$failures"
   fi
+  shiva_status ok "Recent warnings" "$recent_warnings"
   shiva_status ok "Nodes" "$nodes"
 
   case "$watchdog" in
@@ -172,19 +212,22 @@ render_dashboard_text() {
     shiva_status warn "Telegram" "DISABLED"
   fi
 
-  printf '\nAttention:\n'
-  awk -F '\t' '
-    $1 != "ok" {
-      printf "  %-5s %-18s %s\n", $1, $3, $4
-      shown += 1
-    }
-    END {exit shown == 0}
-  ' "$health_tmp" || printf '  none\n'
+  if [[ "$compact" != true ]]; then
+    printf '\nAttention:\n'
+    awk -F '\t' '
+      $1 != "ok" {
+        printf "  %-5s %-18s %s\n", $1, $3, $4
+        shown += 1
+      }
+      END {exit shown == 0}
+    ' "$health_tmp" || printf '  none\n'
+  fi
 }
 
 if [[ "$json" == true ]]; then
   collect_dashboard_state
   render_dashboard_json
+  write_dashboard_snapshot
   exit 0
 fi
 
@@ -194,6 +237,7 @@ while true; do
     clear 2>/dev/null || true
   fi
   collect_dashboard_state
+  write_dashboard_snapshot
   render_dashboard_text
   ((cycles+=1))
   if [[ "$watch" != true ]] || { (( count > 0 )) && (( cycles >= count )); }; then

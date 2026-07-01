@@ -12,6 +12,9 @@ Release focus:
   for continuous service mode;
 - introduce the shared Health Engine as the canonical local state source for
   Health, Dashboard, Advisor, and Cluster;
+- add Dashboard 2.0 metrics, compact display, reusable dashboard snapshot,
+  history JSON/date/service filters, notification test command, and watchdog
+  metadata for last success and consecutive failures;
 - add schema-versioned JSON output for automation consumers;
 - preserve local configuration and profile overrides during installation and
   package upgrades.

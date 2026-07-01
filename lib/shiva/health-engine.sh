@@ -6,7 +6,36 @@
 shiva_health_engine_collect() {
   local temp raw_temp temp_level ram_total ram_used ram_percent ram_level
   local smart_disk disk_model disk_label root_percent fs_level interface
-  local active_interfaces state failed_units
+  local active_interfaces state failed_units updated_at uptime_seconds uptime_days
+  local load1 load5 load15 cpu_count load_level root_avail root_free_percent
+
+  updated_at="$(date -Iseconds)"
+  printf '%s\t%s\t%s\t%s\n' "ok" "updated_at" "Updated" "$updated_at"
+
+  if [[ -r /proc/uptime ]]; then
+    read -r uptime_seconds _ < /proc/uptime
+    uptime_seconds="${uptime_seconds%%.*}"
+    uptime_days=$((uptime_seconds / 86400))
+    printf '%s\t%s\t%s\t%s\n' "ok" "uptime" "Uptime" "${uptime_days}d $(((uptime_seconds % 86400) / 3600))h"
+  else
+    printf '%s\t%s\t%s\t%s\n' "warn" "uptime" "Uptime" "UNAVAILABLE"
+  fi
+
+  if [[ -r /proc/loadavg ]]; then
+    read -r load1 load5 load15 _ < /proc/loadavg
+    cpu_count="$(getconf _NPROCESSORS_ONLN 2>/dev/null || printf '1')"
+    load_level="$(
+      awk -v load="$load1" -v cpus="$cpu_count" 'BEGIN {
+        if (cpus < 1) cpus = 1
+        if (load >= cpus * 2) print "fail"
+        else if (load >= cpus) print "warn"
+        else print "ok"
+      }'
+    )"
+    printf '%s\t%s\t%s\t%s\n' "$load_level" "load_average" "Load average" "$load1 $load5 $load15"
+  else
+    printf '%s\t%s\t%s\t%s\n' "warn" "load_average" "Load average" "UNAVAILABLE"
+  fi
 
   if shiva_check_enabled CHECK_TEMPERATURE; then
     temp="UNKNOWN"
@@ -71,6 +100,8 @@ shiva_health_engine_collect() {
     fs_level=ok
   fi
   printf '%s\t%s\t%s\t%s\n' "$fs_level" "root_fs" "Root FS" "${root_percent}%"
+  read -r root_avail root_free_percent < <(df -P -h / | awk 'NR==2 {gsub("%","",$5); print $4, 100 - $5}')
+  printf '%s\t%s\t%s\t%s\n' "$fs_level" "root_free" "Root free" "${root_avail} free (${root_free_percent}%)"
 
   if shiva_check_enabled CHECK_INTERFACES; then
     if [[ -n "$REQUIRED_INTERFACES" ]]; then

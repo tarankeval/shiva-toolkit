@@ -33,6 +33,7 @@ while (($#)); do
 done
 
 show_status() {
+  local meta_value rc=0
   shiva_title "SHIVA WATCHDOG STATUS v$SHIVA_VERSION"
   if [[ ! -r "$SHIVA_WATCHDOG_STATE_FILE" ]]; then
     shiva_status warn "State" "NO DATA"
@@ -43,7 +44,7 @@ show_status() {
   local state count targets
   state="$(<"$SHIVA_WATCHDOG_STATE_FILE")"
   case "$state" in
-    ok) shiva_status ok "State" "OK"; return 0 ;;
+    ok) shiva_status ok "State" "OK"; rc=0 ;;
     fail:*)
       count="${state#fail:}"
       targets=""
@@ -53,10 +54,17 @@ show_status() {
       fi
       shiva_status fail "State" "$count failure(s)"
       [[ -n "$targets" ]] && shiva_status warn "Repair targets" "$targets"
-      return 2
+      rc=2
       ;;
-    *) shiva_status warn "State" "$state"; return 1 ;;
+    *) shiva_status warn "State" "$state"; rc=1 ;;
   esac
+  if [[ -r "$SHIVA_WATCHDOG_META_FILE" ]]; then
+    meta_value="$(sed -n 's/.*"last_success":"\([^"]*\)".*/\1/p' "$SHIVA_WATCHDOG_META_FILE")"
+    [[ -n "$meta_value" ]] && shiva_status ok "Last success" "$meta_value"
+    meta_value="$(sed -n 's/.*"consecutive_failures":\([0-9][0-9]*\).*/\1/p' "$SHIVA_WATCHDOG_META_FILE")"
+    [[ -n "$meta_value" ]] && shiva_status ok "Consecutive failures" "$meta_value"
+  fi
+  return "$rc"
 }
 
 show_config() {
@@ -68,12 +76,14 @@ show_config() {
     shiva_status ok "Auto repair" "DISABLED"
   fi
   shiva_status ok "Repair targets" "$SHIVA_WATCHDOG_REPAIR_TARGETS"
+  shiva_status ok "Failure threshold" "$SHIVA_WATCHDOG_FAILURE_THRESHOLD"
   if shiva_enabled "$SHIVA_NOTIFY_ON_WATCHDOG"; then
     shiva_status ok "Notifications" "ENABLED"
   else
     shiva_status warn "Notifications" "DISABLED"
   fi
   shiva_status ok "State file" "$SHIVA_WATCHDOG_STATE_FILE"
+  shiva_status ok "Metadata file" "$SHIVA_WATCHDOG_META_FILE"
   shiva_status ok "History file" "$SHIVA_HISTORY_FILE"
 }
 
@@ -141,8 +151,39 @@ write_watchdog_state() {
   { printf '%s\n' "$state" >"$SHIVA_WATCHDOG_STATE_FILE"; } 2>/dev/null || return 0
 }
 
+watchdog_meta_value() {
+  local key="$1"
+  [[ -r "$SHIVA_WATCHDOG_META_FILE" ]] || return 1
+  sed -n "s/.*\"$key\":\\([^,}]*\\).*/\\1/p" "$SHIVA_WATCHDOG_META_FILE" |
+    sed 's/^"//;s/"$//'
+}
+
+write_watchdog_meta() {
+  local state="$1" failures="$2" targets="$3" consecutive="$4" last_success="$5" dir tmp_file
+  dir="$(dirname -- "$SHIVA_WATCHDOG_META_FILE")"
+  mkdir -p "$dir" 2>/dev/null || return 0
+  tmp_file="$dir/.watchdog.$$"
+  {
+    printf '{'
+    shiva_json_metadata "watchdog" "$state" "null"
+    printf '"state":"%s",' "$(shiva_json_escape "$state")"
+    printf '"failures":%s,' "$failures"
+    printf '"consecutive_failures":%s,' "$consecutive"
+    printf '"failure_threshold":%s,' "$SHIVA_WATCHDOG_FAILURE_THRESHOLD"
+    printf '"last_success":"%s",' "$(shiva_json_escape "$last_success")"
+    printf '"targets":"%s",' "$(shiva_json_escape "$targets")"
+    printf '"updated_at":"%s"' "$(date -Iseconds)"
+    printf '}\n'
+  } >"$tmp_file" 2>/dev/null &&
+    mv "$tmp_file" "$SHIVA_WATCHDOG_META_FILE" 2>/dev/null || {
+      rm -f "$tmp_file" 2>/dev/null || true
+      return 0
+    }
+}
+
 watchdog_cycle() {
   local failures=0 state root_percent raw_temp interface previous_state current_state targets
+  local previous_consecutive consecutive_failures last_success alert_ready=false
   local -a repair_targets=()
 
   shiva_gateway_ok &&
@@ -205,12 +246,20 @@ watchdog_cycle() {
   previous_state=""
   [[ -r "$SHIVA_WATCHDOG_STATE_FILE" ]] &&
     previous_state="$(<"$SHIVA_WATCHDOG_STATE_FILE")"
+  previous_consecutive="$(watchdog_meta_value consecutive_failures || true)"
+  [[ "$previous_consecutive" =~ ^[0-9]+$ ]] || previous_consecutive=0
+  last_success="$(watchdog_meta_value last_success || true)"
 
   if (( failures > 0 )); then
+    consecutive_failures=$((previous_consecutive + 1))
     targets="$(repair_target_string)"
     current_state="fail:$failures"
     [[ -n "$targets" ]] && current_state+=":$targets"
-    if [[ "$previous_state" != "$current_state" ]]; then
+    if [[ "$SHIVA_WATCHDOG_FAILURE_THRESHOLD" =~ ^[0-9]+$ ]] &&
+      (( consecutive_failures >= SHIVA_WATCHDOG_FAILURE_THRESHOLD )); then
+      alert_ready=true
+    fi
+    if [[ "$previous_state" != "$current_state" ]] && [[ "$alert_ready" == true ]]; then
       if [[ -n "$targets" ]]; then
         shiva_history_add watchdog fail "$failures failure(s) detected; repair targets: $targets"
         notify_watchdog fail "$failures failure(s) detected; repair targets: $targets"
@@ -220,18 +269,21 @@ watchdog_cycle() {
       fi
     fi
     write_watchdog_state "$current_state"
-    if [[ "$previous_state" != "$current_state" ]] && shiva_enabled "$SHIVA_WATCHDOG_AUTO_REPAIR"; then
+    write_watchdog_meta "fail" "$failures" "$targets" "$consecutive_failures" "$last_success"
+    if [[ "$previous_state" != "$current_state" ]] && [[ "$alert_ready" == true ]] && shiva_enabled "$SHIVA_WATCHDOG_AUTO_REPAIR"; then
       run_auto_repairs
     fi
     return 2
   fi
 
   current_state="ok"
+  last_success="$(date -Iseconds)"
   if [[ "$previous_state" != "$current_state" ]]; then
     shiva_history_add watchdog ok "all checks passed"
     notify_watchdog ok "all checks passed"
   fi
   write_watchdog_state "$current_state"
+  write_watchdog_meta "ok" 0 "" 0 "$last_success"
   return 0
 }
 
