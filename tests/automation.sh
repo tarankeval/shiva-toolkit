@@ -77,6 +77,94 @@ test -r "$stage/notify.queue"
 grep -q 'overall changed from previous' "$stage/events.log"
 grep -q 'overall changed from previous' "$stage/notify.queue"
 
+health_timeline_before="$(wc -l <"$stage/health.timeline" | tr -d ' ')"
+NO_COLOR=1 SHIVA_HEALTH_SNAPSHOT_FILE="$stage/health.json" \
+  SHIVA_HEALTH_TIMELINE_FILE="$stage/health.timeline" \
+  SHIVA_EVENT_FILE="$stage/events.log" \
+  SHIVA_NOTIFY_QUEUE_FILE="$stage/notify.queue" \
+  "$PROJECT_DIR/bin/shiva-health" --json >/dev/null || true
+health_timeline_after="$(wc -l <"$stage/health.timeline" | tr -d ' ')"
+(( health_timeline_after > health_timeline_before ))
+
+state_output="$(
+  NO_COLOR=1 SHIVA_HEALTH_SNAPSHOT_FILE="$stage/health.json" \
+    SHIVA_HEALTH_TIMELINE_FILE="$stage/health.timeline" \
+    SHIVA_EVENT_FILE="$stage/events.log" \
+    SHIVA_NOTIFY_QUEUE_FILE="$stage/notify.queue" \
+    "$PROJECT_DIR/bin/shiva-state"
+)"
+grep -q 'SHIVA STATE' <<<"$state_output"
+grep -q 'Health snapshot' <<<"$state_output"
+grep -q 'Snapshot age' <<<"$state_output"
+grep -q 'Timeline entries' <<<"$state_output"
+grep -q 'Notify queue' <<<"$state_output"
+
+state_json="$(
+  NO_COLOR=1 SHIVA_HEALTH_SNAPSHOT_FILE="$stage/health.json" \
+    SHIVA_HEALTH_TIMELINE_FILE="$stage/health.timeline" \
+    SHIVA_EVENT_FILE="$stage/events.log" \
+    SHIVA_NOTIFY_QUEUE_FILE="$stage/notify.queue" \
+    "$PROJECT_DIR/bin/shiva-state" --json
+)"
+grep -q '"schema":1' <<<"$state_json"
+grep -q '"source":"state"' <<<"$state_json"
+grep -q '"health_snapshot":"' <<<"$state_json"
+grep -q '"snapshot_age_seconds":' <<<"$state_json"
+grep -q '"timestamp":' <<<"$state_json"
+grep -q '"timeline_entries":' <<<"$state_json"
+grep -q '"events":' <<<"$state_json"
+grep -q '"notify_queue_messages":' <<<"$state_json"
+grep -q '"limits":' <<<"$state_json"
+
+seq 1 5 >"$stage/cleanup.timeline"
+seq 1 5 >"$stage/cleanup.events"
+seq 1 5 >"$stage/cleanup.queue"
+cleanup_dry="$(
+  NO_COLOR=1 SHIVA_HEALTH_SNAPSHOT_FILE="$stage/health.json" \
+    SHIVA_HEALTH_TIMELINE_FILE="$stage/cleanup.timeline" \
+    SHIVA_EVENT_FILE="$stage/cleanup.events" \
+    SHIVA_NOTIFY_QUEUE_FILE="$stage/cleanup.queue" \
+    SHIVA_TIMELINE_MAX_LINES=3 \
+    SHIVA_EVENTS_MAX_LINES=2 \
+    SHIVA_NOTIFY_QUEUE_MAX_LINES=4 \
+    "$PROJECT_DIR/bin/shiva-state" cleanup --dry-run
+)"
+grep -q 'Health snapshot' <<<"$cleanup_dry"
+grep -q 'PLAN trim Health timeline' <<<"$cleanup_dry"
+grep -q 'PLAN trim Events log' <<<"$cleanup_dry"
+grep -q 'PLAN trim Notify queue' <<<"$cleanup_dry"
+[[ "$(wc -l <"$stage/cleanup.timeline" | tr -d ' ')" -eq 5 ]]
+[[ "$(wc -l <"$stage/cleanup.events" | tr -d ' ')" -eq 5 ]]
+[[ "$(wc -l <"$stage/cleanup.queue" | tr -d ' ')" -eq 5 ]]
+test -r "$stage/health.json"
+
+cleanup_apply="$(
+  NO_COLOR=1 SHIVA_HEALTH_SNAPSHOT_FILE="$stage/health.json" \
+    SHIVA_HEALTH_TIMELINE_FILE="$stage/cleanup.timeline" \
+    SHIVA_EVENT_FILE="$stage/cleanup.events" \
+    SHIVA_NOTIFY_QUEUE_FILE="$stage/cleanup.queue" \
+    SHIVA_TIMELINE_MAX_LINES=3 \
+    SHIVA_EVENTS_MAX_LINES=2 \
+    SHIVA_NOTIFY_QUEUE_MAX_LINES=4 \
+    "$PROJECT_DIR/bin/shiva-state" cleanup --apply
+)"
+grep -q 'RUN trim Health timeline' <<<"$cleanup_apply"
+grep -q 'RUN trim Events log' <<<"$cleanup_apply"
+grep -q 'RUN trim Notify queue' <<<"$cleanup_apply"
+[[ "$(wc -l <"$stage/cleanup.timeline" | tr -d ' ')" -eq 3 ]]
+[[ "$(wc -l <"$stage/cleanup.events" | tr -d ' ')" -eq 2 ]]
+[[ "$(wc -l <"$stage/cleanup.queue" | tr -d ' ')" -eq 4 ]]
+test -r "$stage/health.json"
+
+seq 1 5 >"$stage/limited.timeline"
+NO_COLOR=1 SHIVA_HEALTH_SNAPSHOT_FILE="$stage/limited-health.json" \
+  SHIVA_HEALTH_TIMELINE_FILE="$stage/limited.timeline" \
+  SHIVA_EVENT_FILE="$stage/limited-events.log" \
+  SHIVA_NOTIFY_QUEUE_FILE="$stage/limited-queue.log" \
+  SHIVA_TIMELINE_MAX_LINES=3 \
+  "$PROJECT_DIR/bin/shiva-health" --json >/dev/null || true
+[[ "$(wc -l <"$stage/limited.timeline" | tr -d ' ')" -eq 3 ]]
+
 health_timeline_json="$(
   NO_COLOR=1 SHIVA_HEALTH_TIMELINE_FILE="$stage/health.timeline" \
     "$PROJECT_DIR/bin/shiva-history" --health --json 10

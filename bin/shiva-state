@@ -1,0 +1,175 @@
+#!/usr/bin/env bash
+set -u
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../lib/shiva/bootstrap.sh" 2>/dev/null || source /usr/local/lib/shiva/bootstrap.sh
+shiva_load_common
+
+usage() {
+  cat <<'EOF'
+Usage: shiva state [--json]
+       shiva state cleanup --dry-run
+       shiva state cleanup --apply
+
+Inspect Shiva Health snapshot state and safely trim append-only state logs.
+Cleanup never removes the current health snapshot.
+EOF
+}
+
+json_value() {
+  local key="$1" file="$2"
+  [[ -r "$file" ]] || return 0
+  sed -n "s/.*\"$key\":\"\([^\"]*\)\".*/\1/p" "$file" | head -n 1
+}
+
+json_number() {
+  local key="$1" file="$2"
+  [[ -r "$file" ]] || return 0
+  sed -n "s/.*\"$key\":\([0-9][0-9]*\|null\).*/\1/p" "$file" | head -n 1
+}
+
+line_count() {
+  local file="$1"
+  if [[ -r "$file" ]]; then
+    wc -l <"$file" 2>/dev/null | tr -d ' ' || printf '0'
+  else
+    printf '0'
+  fi
+}
+
+snapshot_age_seconds() {
+  local file="$1" modified now
+  [[ -r "$file" ]] || {
+    printf 'null'
+    return 0
+  }
+  modified="$(stat -c %Y "$file" 2>/dev/null || true)"
+  now="$(date +%s)"
+  if [[ "$modified" =~ ^[0-9]+$ ]]; then
+    printf '%s' "$((now - modified))"
+  else
+    printf 'null'
+  fi
+}
+
+human_age() {
+  local seconds="$1"
+  [[ "$seconds" =~ ^[0-9]+$ ]] || {
+    printf 'UNKNOWN'
+    return 0
+  }
+  if (( seconds < 60 )); then
+    printf '%ss' "$seconds"
+  elif (( seconds < 3600 )); then
+    printf '%sm %ss' "$((seconds / 60))" "$((seconds % 60))"
+  else
+    printf '%sh %sm' "$((seconds / 3600))" "$(((seconds % 3600) / 60))"
+  fi
+}
+
+show_state() {
+  local json="$1" snapshot_exists=false timestamp overall health_percent age
+  local timeline_entries events_count queue_count
+
+  if [[ -r "$SHIVA_HEALTH_SNAPSHOT_FILE" ]]; then
+    snapshot_exists=true
+  fi
+  timestamp="$(json_value timestamp "$SHIVA_HEALTH_SNAPSHOT_FILE")"
+  overall="$(json_value overall "$SHIVA_HEALTH_SNAPSHOT_FILE")"
+  health_percent="$(json_number health_percent "$SHIVA_HEALTH_SNAPSHOT_FILE")"
+  age="$(snapshot_age_seconds "$SHIVA_HEALTH_SNAPSHOT_FILE")"
+  timeline_entries="$(line_count "$SHIVA_HEALTH_TIMELINE_FILE")"
+  events_count="$(line_count "$SHIVA_EVENT_FILE")"
+  queue_count="$(line_count "$SHIVA_NOTIFY_QUEUE_FILE")"
+
+  : "${timestamp:=unknown}"
+  : "${overall:=unknown}"
+  : "${health_percent:=null}"
+
+  if [[ "$json" == true ]]; then
+    printf '{'
+    shiva_json_metadata "state" "$overall" "$health_percent"
+    printf '"health_snapshot":"%s",' "$(shiva_json_escape "$SHIVA_HEALTH_SNAPSHOT_FILE")"
+    printf '"snapshot_exists":%s,' "$snapshot_exists"
+    printf '"snapshot_age_seconds":%s,' "$age"
+    printf '"timestamp":"%s",' "$(shiva_json_escape "$timestamp")"
+    printf '"timeline_file":"%s",' "$(shiva_json_escape "$SHIVA_HEALTH_TIMELINE_FILE")"
+    printf '"timeline_entries":%s,' "$timeline_entries"
+    printf '"events_file":"%s",' "$(shiva_json_escape "$SHIVA_EVENT_FILE")"
+    printf '"events":%s,' "$events_count"
+    printf '"notify_queue_file":"%s",' "$(shiva_json_escape "$SHIVA_NOTIFY_QUEUE_FILE")"
+    printf '"notify_queue_messages":%s,' "$queue_count"
+    printf '"limits":{"timeline":%s,"events":%s,"notify_queue":%s},' \
+      "$SHIVA_TIMELINE_MAX_LINES" "$SHIVA_EVENTS_MAX_LINES" "$SHIVA_NOTIFY_QUEUE_MAX_LINES"
+    printf '"checks":[]}\n'
+    return 0
+  fi
+
+  shiva_title "SHIVA STATE v$SHIVA_VERSION"
+  if [[ "$snapshot_exists" == true ]]; then
+    shiva_status ok "Health snapshot" "$SHIVA_HEALTH_SNAPSHOT_FILE"
+    shiva_status ok "Snapshot age" "$(human_age "$age")"
+  else
+    shiva_status warn "Health snapshot" "$SHIVA_HEALTH_SNAPSHOT_FILE (missing)"
+    shiva_status warn "Snapshot age" "UNKNOWN"
+  fi
+  shiva_status ok "Timestamp" "$timestamp"
+  case "$overall" in
+    excellent) shiva_status ok "Overall" "$overall" ;;
+    good_with_warnings) shiva_status warn "Overall" "$overall" ;;
+    attention_required) shiva_status fail "Overall" "$overall" ;;
+    *) shiva_status warn "Overall" "$overall" ;;
+  esac
+  shiva_status ok "Health percent" "$health_percent"
+  shiva_status ok "Timeline entries" "$timeline_entries ($SHIVA_HEALTH_TIMELINE_FILE)"
+  shiva_status ok "Events" "$events_count ($SHIVA_EVENT_FILE)"
+  shiva_status ok "Notify queue" "$queue_count ($SHIVA_NOTIFY_QUEUE_FILE)"
+  shiva_status ok "Limits" "timeline=$SHIVA_TIMELINE_MAX_LINES events=$SHIVA_EVENTS_MAX_LINES notify_queue=$SHIVA_NOTIFY_QUEUE_MAX_LINES"
+}
+
+cleanup_target() {
+  local label="$1" file="$2" max_lines="$3" apply="$4" count remove_count
+  count="$(line_count "$file")"
+  [[ "$max_lines" =~ ^[0-9]+$ ]] || max_lines=0
+  if (( max_lines <= 0 )); then
+    printf 'SKIP %s: invalid limit %s\n' "$label" "$max_lines"
+    return 0
+  fi
+  if (( count <= max_lines )); then
+    printf 'OK %s: %s line(s), limit %s\n' "$label" "$count" "$max_lines"
+    return 0
+  fi
+  remove_count=$((count - max_lines))
+  if [[ "$apply" == true ]]; then
+    shiva_trim_file_lines "$file" "$max_lines"
+    printf 'RUN trim %s: removed %s old line(s), kept %s\n' "$label" "$remove_count" "$max_lines"
+  else
+    printf 'PLAN trim %s: remove %s old line(s), keep %s\n' "$label" "$remove_count" "$max_lines"
+  fi
+}
+
+cleanup_state() {
+  local mode="${1:-}" apply=false
+  case "$mode" in
+    --dry-run) apply=false ;;
+    --apply) apply=true ;;
+    *)
+      printf 'Cleanup requires explicit --dry-run or --apply.\n' >&2
+      usage >&2
+      return 1
+      ;;
+  esac
+
+  shiva_title "SHIVA STATE CLEANUP v$SHIVA_VERSION"
+  shiva_status ok "Health snapshot" "$SHIVA_HEALTH_SNAPSHOT_FILE (never deleted)"
+  cleanup_target "Health timeline" "$SHIVA_HEALTH_TIMELINE_FILE" "$SHIVA_TIMELINE_MAX_LINES" "$apply"
+  cleanup_target "Events log" "$SHIVA_EVENT_FILE" "$SHIVA_EVENTS_MAX_LINES" "$apply"
+  cleanup_target "Notify queue" "$SHIVA_NOTIFY_QUEUE_FILE" "$SHIVA_NOTIFY_QUEUE_MAX_LINES" "$apply"
+}
+
+case "${1:-}" in
+  "") show_state false ;;
+  --json) show_state true ;;
+  cleanup) shift; cleanup_state "${1:-}" ;;
+  -h|--help|help) usage ;;
+  *) printf 'Unknown state option: %s\n' "$1" >&2; usage >&2; exit 1 ;;
+esac

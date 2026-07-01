@@ -41,6 +41,7 @@ shiva-watchdog    Automation checks for service supervision
 shiva-history     Local operational history
 shiva-advisor     Operational recommendations
 shiva-dashboard   Compact operational dashboard
+shiva-state       Health snapshot diagnostics and cleanup
 shiva-notify      Configured notifications
 shiva-service     Manage Shiva systemd services
 shiva-nodes       Configured node inventory
@@ -89,6 +90,10 @@ shiva dashboard --json
 shiva dashboard --compact
 shiva dashboard --rich
 shiva dashboard --watch --interval 5
+shiva state
+shiva state --json
+shiva state cleanup --dry-run
+shiva state cleanup --apply
 shiva notify status
 shiva notify test
 shiva notify --dry-run "test message"
@@ -166,6 +171,20 @@ dashboard snapshots. Changes are appended to:
 /var/lib/shiva/events.log
 /var/lib/shiva/notify.queue
 ```
+
+Append-only state files are bounded by configuration limits:
+
+```text
+SHIVA_TIMELINE_MAX_LINES=1000
+SHIVA_EVENTS_MAX_LINES=1000
+SHIVA_NOTIFY_QUEUE_MAX_LINES=1000
+```
+
+`shiva state` reports the current snapshot path, age, timestamp, health status,
+timeline size, event count, and notification queue size. `shiva state cleanup
+--dry-run` previews retention cleanup; `shiva state cleanup --apply` trims old
+timeline, event, and queue entries according to the configured limits. Cleanup
+never deletes `/var/lib/shiva/health.json`.
 
 This prepares the path for `Health Engine -> Event Engine -> Notification
 Queue -> Telegram` without making Telegram responsible for deciding what

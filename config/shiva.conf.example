@@ -38,6 +38,13 @@ SHIVA_CONNECT_TIMEOUT=3
 # Automation and repair.
 SHIVA_STATE_DIR="/var/lib/shiva"
 SHIVA_HISTORY_FILE="/var/lib/shiva/history.log"
+SHIVA_HEALTH_SNAPSHOT_FILE="/var/lib/shiva/health.json"
+SHIVA_HEALTH_TIMELINE_FILE="/var/lib/shiva/health.timeline"
+SHIVA_EVENT_FILE="/var/lib/shiva/events.log"
+SHIVA_NOTIFY_QUEUE_FILE="/var/lib/shiva/notify.queue"
+SHIVA_TIMELINE_MAX_LINES=1000
+SHIVA_EVENTS_MAX_LINES=1000
+SHIVA_NOTIFY_QUEUE_MAX_LINES=1000
 SHIVA_WATCHDOG_STATE_FILE="/var/lib/shiva/watchdog.state"
 SHIVA_REPAIR_INTERFACE=""
 SHIVA_OPENVPN_SERVICE=""

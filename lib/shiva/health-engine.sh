@@ -241,15 +241,34 @@ shiva_health_snapshot_json_from_file() {
   printf ']}\n'
 }
 
+shiva_trim_file_lines() {
+  local file="$1" max_lines="$2" line_count dir tmp_file
+  [[ "$max_lines" =~ ^[0-9]+$ ]] || return 0
+  (( max_lines > 0 )) || return 0
+  [[ -r "$file" ]] || return 0
+  line_count="$(wc -l <"$file" 2>/dev/null | tr -d ' ' || printf '0')"
+  [[ "$line_count" =~ ^[0-9]+$ ]] || return 0
+  (( line_count > max_lines )) || return 0
+  dir="$(dirname -- "$file")"
+  tmp_file="$dir/.shiva-trim.$$"
+  { tail -n "$max_lines" "$file" >"$tmp_file"; } 2>/dev/null &&
+    { mv "$tmp_file" "$file"; } 2>/dev/null || {
+      rm -f "$tmp_file" 2>/dev/null || true
+      return 0
+    }
+}
+
 shiva_event_emit() {
   local level="$1" category="$2" message="$3" dir timestamp
   timestamp="$(date -Iseconds)"
   dir="$(dirname -- "$SHIVA_EVENT_FILE")"
   mkdir -p "$dir" 2>/dev/null || return 0
   { printf '%s\t%s\t%s\t%s\n' "$timestamp" "$level" "$category" "$message" >>"$SHIVA_EVENT_FILE"; } 2>/dev/null || return 0
+  shiva_trim_file_lines "$SHIVA_EVENT_FILE" "$SHIVA_EVENTS_MAX_LINES"
   dir="$(dirname -- "$SHIVA_NOTIFY_QUEUE_FILE")"
   mkdir -p "$dir" 2>/dev/null || return 0
   { printf '%s\t%s\t%s\t%s\n' "$timestamp" "$level" "$category" "$message" >>"$SHIVA_NOTIFY_QUEUE_FILE"; } 2>/dev/null || return 0
+  shiva_trim_file_lines "$SHIVA_NOTIFY_QUEUE_FILE" "$SHIVA_NOTIFY_QUEUE_MAX_LINES"
 }
 
 shiva_health_snapshot_write() {
@@ -270,6 +289,7 @@ shiva_health_snapshot_write() {
     }
   mkdir -p "$(dirname -- "$SHIVA_HEALTH_TIMELINE_FILE")" 2>/dev/null || true
   { printf '%s\t%s\t%s\t%s\n' "$(date -Iseconds)" "$SHIVA_HEALTH_PERCENT" "$SHIVA_HEALTH_OVERALL" "$SHIVA_HEALTH_FAILURES" >>"$SHIVA_HEALTH_TIMELINE_FILE"; } 2>/dev/null || true
+  shiva_trim_file_lines "$SHIVA_HEALTH_TIMELINE_FILE" "$SHIVA_TIMELINE_MAX_LINES"
   if [[ -n "${previous_overall:-}" && "$previous_overall" != "$SHIVA_HEALTH_OVERALL" ]]; then
     shiva_event_emit "info" "health" "overall changed from $previous_overall to $SHIVA_HEALTH_OVERALL"
   elif [[ -n "${previous_percent:-}" && "$previous_percent" != "$SHIVA_HEALTH_PERCENT" ]]; then

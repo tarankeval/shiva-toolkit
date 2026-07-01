@@ -234,7 +234,7 @@ show_release_diagnostics() {
   check_release_file "Automation tests" "tests/automation.sh"
 
   for name in shiva shiva-watchdog shiva-repair shiva-history shiva-log shiva-notify \
-    shiva-advisor shiva-dashboard shiva-service shiva-nodes shiva-cluster; do
+    shiva-advisor shiva-dashboard shiva-state shiva-service shiva-nodes shiva-cluster; do
     check_release_exec "bin/$name"
   done
 

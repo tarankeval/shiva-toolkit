@@ -232,6 +232,13 @@ Initial implementation status:
   `/var/lib/shiva/health.timeline`;
 - health state changes are written as events and queued for future notification
   delivery;
+- append-only monitoring state is bounded by `SHIVA_TIMELINE_MAX_LINES`,
+  `SHIVA_EVENTS_MAX_LINES`, and `SHIVA_NOTIFY_QUEUE_MAX_LINES`;
+- `shiva state` reports snapshot age, timestamp, health status, timeline size,
+  event count, and notification queue size;
+- `shiva state cleanup --dry-run` and `shiva state cleanup --apply` safely trim
+  old timeline, event, and queue entries without deleting the current
+  `health.json` snapshot;
 - `shiva history` supports JSON output, date filtering, INFO/WARNING/ERROR
   level aliases, and service/message search;
 - `shiva notify test` exercises configured notification delivery;

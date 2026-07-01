@@ -20,6 +20,7 @@ grep -q 'watchdog Run automation checks' <<<"$help_output"
 grep -q 'history  Show operational history' <<<"$help_output"
 grep -q 'advisor  Show operational recommendations' <<<"$help_output"
 grep -q 'dashboard Show compact operational dashboard' <<<"$help_output"
+grep -q 'state    Inspect Health snapshot state' <<<"$help_output"
 grep -q 'notify   Send configured notifications' <<<"$help_output"
 grep -q 'service  Manage Shiva systemd services' <<<"$help_output"
 grep -q 'nodes    Show configured node inventory' <<<"$help_output"
@@ -43,6 +44,7 @@ NO_COLOR=1 "$PROJECT_DIR/bin/shiva-repair" --help >/dev/null
 NO_COLOR=1 "$PROJECT_DIR/bin/shiva-watchdog" --help >/dev/null
 NO_COLOR=1 "$PROJECT_DIR/bin/shiva-advisor" --help >/dev/null
 NO_COLOR=1 "$PROJECT_DIR/bin/shiva-dashboard" --help >/dev/null
+NO_COLOR=1 "$PROJECT_DIR/bin/shiva-state" --help >/dev/null
 NO_COLOR=1 "$PROJECT_DIR/bin/shiva-notify" --help >/dev/null
 NO_COLOR=1 "$PROJECT_DIR/bin/shiva-service" --help >/dev/null
 NO_COLOR=1 "$PROJECT_DIR/bin/shiva-nodes" --help >/dev/null
@@ -55,6 +57,7 @@ bash "$PROJECT_DIR/tests/automation.sh"
 install_output="$(DESTDIR="$stage" "$PROJECT_DIR/install.sh")"
 grep -q 'Shiva Toolkit v1.1.0-dev Automation Preview installed' <<<"$install_output"
 test -x "$stage/usr/local/bin/shiva"
+test -x "$stage/usr/local/bin/shiva-state"
 test -r "$stage/usr/local/lib/shiva/common.sh"
 test -r "$stage/usr/local/lib/shiva/health-engine.sh"
 test -r "$stage/usr/local/lib/shiva/profiles/shiva-server.conf"

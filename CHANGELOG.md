@@ -17,6 +17,8 @@ Release focus:
   metadata for last success and consecutive failures;
 - add canonical health snapshot, health timeline, event log, and notification
   queue files as the foundation for Monitoring Phase 2;
+- add `shiva state` diagnostics, JSON output, explicit dry-run/apply cleanup,
+  and retention limits for timeline, event, and notification queue files;
 - add schema-versioned JSON output for automation consumers;
 - preserve local configuration and profile overrides during installation and
   package upgrades.
