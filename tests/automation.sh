@@ -49,7 +49,16 @@ grep -q '"source":"history"' <<<"$history_date_json"
 grep -q '"OpenVPN disconnected"' <<<"$history_date_json"
 ! grep -q 'DNS failed' <<<"$history_date_json"
 
-health_json_output="$(NO_COLOR=1 "$PROJECT_DIR/bin/shiva-health" --json || true)"
+cat >"$stage/health.json" <<'EOF'
+{"schema":1,"overall":"previous","health_percent":0}
+EOF
+health_json_output="$(
+  NO_COLOR=1 SHIVA_HEALTH_SNAPSHOT_FILE="$stage/health.json" \
+    SHIVA_HEALTH_TIMELINE_FILE="$stage/health.timeline" \
+    SHIVA_EVENT_FILE="$stage/events.log" \
+    SHIVA_NOTIFY_QUEUE_FILE="$stage/notify.queue" \
+    "$PROJECT_DIR/bin/shiva-health" --json || true
+)"
 grep -q '"schema":1' <<<"$health_json_output"
 grep -q '"overall":' <<<"$health_json_output"
 grep -q '"checks":\[' <<<"$health_json_output"
@@ -57,6 +66,23 @@ grep -q '"key":"dns"' <<<"$health_json_output"
 grep -q '"key":"uptime"' <<<"$health_json_output"
 grep -q '"key":"load_average"' <<<"$health_json_output"
 grep -q '"key":"root_free"' <<<"$health_json_output"
+grep -q '"timestamp":' <<<"$health_json_output"
+grep -q '"metrics":' <<<"$health_json_output"
+grep -q '"events":\[' <<<"$health_json_output"
+grep -q '"services":\[' <<<"$health_json_output"
+test -r "$stage/health.json"
+test -r "$stage/health.timeline"
+test -r "$stage/events.log"
+test -r "$stage/notify.queue"
+grep -q 'overall changed from previous' "$stage/events.log"
+grep -q 'overall changed from previous' "$stage/notify.queue"
+
+health_timeline_json="$(
+  NO_COLOR=1 SHIVA_HEALTH_TIMELINE_FILE="$stage/health.timeline" \
+    "$PROJECT_DIR/bin/shiva-history" --health --json 10
+)"
+grep -q '"source":"health-timeline"' <<<"$health_timeline_json"
+grep -q '"points":\[' <<<"$health_timeline_json"
 
 log_watchdog_output="$(
   NO_COLOR=1 SHIVA_HISTORY_FILE="$history_file" \
@@ -136,6 +162,16 @@ dashboard_compact_output="$(
 )"
 grep -q 'SHIVA DASHBOARD' <<<"$dashboard_compact_output"
 ! grep -q 'Attention' <<<"$dashboard_compact_output"
+! grep -q 'Passed' <<<"$dashboard_compact_output"
+
+dashboard_rich_output="$(
+  NO_COLOR=1 SHIVA_HISTORY_FILE="$history_file" \
+    SHIVA_DASHBOARD_SNAPSHOT_FILE="$stage/dashboard-rich.json" \
+    "$PROJECT_DIR/bin/shiva-dashboard" --rich
+)"
+grep -q 'System' <<<"$dashboard_rich_output"
+grep -q 'State' <<<"$dashboard_rich_output"
+grep -q 'History' <<<"$dashboard_rich_output"
 
 dashboard_json="$(
   NO_COLOR=1 SHIVA_HISTORY_FILE="$history_file" \

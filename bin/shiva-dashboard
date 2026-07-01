@@ -7,6 +7,7 @@ shiva_load_common
 json=false
 watch=false
 compact=false
+rich=false
 interval="${SHIVA_DASHBOARD_INTERVAL:-5}"
 count=0
 health_tmp="$(mktemp "${TMPDIR:-/tmp}/shiva-dashboard.XXXXXX")" || exit 1
@@ -14,7 +15,7 @@ trap 'rm -f "$health_tmp"' EXIT
 
 usage() {
   cat <<'EOF'
-Usage: shiva dashboard [--json] [--compact] [--watch] [--interval seconds] [--count cycles]
+Usage: shiva dashboard [--json] [--compact] [--rich] [--watch] [--interval seconds] [--count cycles]
 
 Show a compact operational dashboard from the shared Shiva Health Engine.
 EOF
@@ -24,6 +25,7 @@ while (($#)); do
   case "$1" in
     --json) json=true ;;
     --compact) compact=true ;;
+    --rich) rich=true ;;
     --watch) watch=true ;;
     --interval)
       shift
@@ -96,6 +98,7 @@ history_warning_count() {
 
 collect_dashboard_state() {
   shiva_health_engine_collect >"$health_tmp"
+  shiva_health_snapshot_write "$health_tmp" "$SHIVA_HEALTH_SNAPSHOT_FILE" "health-engine"
   passed="$(awk -F '\t' '$1 == "ok" {count += 1} END {print count + 0}' "$health_tmp")"
   warnings="$(awk -F '\t' '$1 == "warn" {count += 1} END {print count + 0}' "$health_tmp")"
   failures="$(awk -F '\t' '$1 == "fail" {count += 1} END {print count + 0}' "$health_tmp")"
@@ -181,10 +184,44 @@ render_dashboard_text() {
     *) shiva_status fail "Health" "${health_percent}%" ;;
   esac
 
+  if [[ "$compact" == true ]]; then
+    [[ -n "$uptime" ]] && shiva_status ok "Uptime" "$uptime"
+    [[ -n "$load_average" ]] && shiva_status ok "Load average" "$load_average"
+    [[ -n "$root_free" ]] && shiva_status ok "Root free" "$root_free"
+    if (( failures > 0 )); then
+      shiva_status fail "Failures" "$failures"
+    else
+      shiva_status ok "Failures" "$failures"
+    fi
+    if (( warnings > 0 )); then
+      shiva_status warn "Warnings" "$warnings"
+    else
+      shiva_status ok "Warnings" "$warnings"
+    fi
+    case "$watchdog" in
+      ok) shiva_status ok "Watchdog" "OK" ;;
+      fail:*) shiva_status fail "Watchdog" "$watchdog" ;;
+      "NO DATA") shiva_status warn "Watchdog" "NO DATA" ;;
+      *) shiva_status warn "Watchdog" "$watchdog" ;;
+    esac
+    if shiva_enabled "$SHIVA_TELEGRAM_ENABLED"; then
+      shiva_status ok "Telegram" "ENABLED"
+    else
+      shiva_status warn "Telegram" "DISABLED"
+    fi
+    return 0
+  fi
+
+  if [[ "$rich" == true ]]; then
+    printf 'System\n'
+  fi
   [[ -n "$updated_at" ]] && shiva_status ok "Updated" "$updated_at"
   [[ -n "$uptime" ]] && shiva_status ok "Uptime" "$uptime"
   [[ -n "$load_average" ]] && shiva_status ok "Load average" "$load_average"
   [[ -n "$root_free" ]] && shiva_status ok "Root free" "$root_free"
+  if [[ "$rich" == true ]]; then
+    printf '\nState\n'
+  fi
   shiva_status ok "Passed" "$passed"
   if (( warnings > 0 )); then
     shiva_status warn "Warnings" "$warnings"
@@ -213,6 +250,10 @@ render_dashboard_text() {
   fi
 
   if [[ "$compact" != true ]]; then
+    if [[ "$rich" == true ]]; then
+      printf '\nHistory\n'
+      shiva_status ok "Recent warnings" "$recent_warnings"
+    fi
     printf '\nAttention:\n'
     awk -F '\t' '
       $1 != "ok" {

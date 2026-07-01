@@ -15,6 +15,8 @@ Release focus:
 - add Dashboard 2.0 metrics, compact display, reusable dashboard snapshot,
   history JSON/date/service filters, notification test command, and watchdog
   metadata for last success and consecutive failures;
+- add canonical health snapshot, health timeline, event log, and notification
+  queue files as the foundation for Monitoring Phase 2;
 - add schema-versioned JSON output for automation consumers;
 - preserve local configuration and profile overrides during installation and
   package upgrades.

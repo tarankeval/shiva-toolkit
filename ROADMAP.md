@@ -228,6 +228,10 @@ Initial implementation status:
   snapshot, so Watchdog status is consistent between dashboard and cluster;
 - `shiva dashboard` includes update time, uptime, load average, free root
   space, recent warning counts, compact mode, and a reusable JSON snapshot;
+- `shiva health` writes `/var/lib/shiva/health.json` and
+  `/var/lib/shiva/health.timeline`;
+- health state changes are written as events and queued for future notification
+  delivery;
 - `shiva history` supports JSON output, date filtering, INFO/WARNING/ERROR
   level aliases, and service/message search;
 - `shiva notify test` exercises configured notification delivery;

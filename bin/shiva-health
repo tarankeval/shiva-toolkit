@@ -26,49 +26,19 @@ while (($#)); do
 done
 
 shiva_health_engine_collect >"$health_tmp"
+shiva_health_summary_from_file "$health_tmp"
+shiva_health_snapshot_write "$health_tmp" "$SHIVA_HEALTH_SNAPSHOT_FILE" "health-engine"
 
-passed="$(awk -F '\t' '$1 == "ok" {count += 1} END {print count + 0}' "$health_tmp")"
-warnings="$(awk -F '\t' '$1 == "warn" {count += 1} END {print count + 0}' "$health_tmp")"
-failures="$(awk -F '\t' '$1 == "fail" {count += 1} END {print count + 0}' "$health_tmp")"
-total=$((passed + warnings + failures))
-if (( total > 0 )); then
-  health_percent=$(((passed * 100 + warnings * 50) / total))
-else
-  health_percent=0
-fi
-
-if (( failures > 0 )); then
-  overall="attention_required"
+if (( SHIVA_HEALTH_FAILURES > 0 )); then
   exit_code=2
-elif (( warnings > 0 )); then
-  overall="good_with_warnings"
+elif (( SHIVA_HEALTH_WARNINGS > 0 )); then
   exit_code=1
 else
-  overall="excellent"
   exit_code=0
 fi
 
 if [[ "$json" == true ]]; then
-  printf '{'
-  shiva_json_metadata "health-engine" "$overall" "$health_percent"
-  printf '"passed":%s,' "$passed"
-  printf '"warnings":%s,' "$warnings"
-  printf '"failures":%s,' "$failures"
-  printf '"checks":['
-  awk -F '\t' '
-    function esc(value) {
-      gsub(/\\/,"\\\\",value)
-      gsub(/"/,"\\\"",value)
-      gsub(/\t/,"\\t",value)
-      return value
-    }
-    {
-      if (count > 0) printf ","
-      printf "{\"level\":\"%s\",\"key\":\"%s\",\"label\":\"%s\",\"value\":\"%s\"}", esc($1), esc($2), esc($3), esc($4)
-      count += 1
-    }
-  ' "$health_tmp"
-  printf ']}\n'
+  shiva_health_snapshot_json_from_file "$health_tmp" "health-engine"
   exit "$exit_code"
 fi
 
@@ -78,12 +48,12 @@ while IFS=$'\t' read -r level _key label value; do
 done <"$health_tmp"
 
 printf '\n══════════════════════════════════════\n\n%sHealth Summary%s\n\n' "$SHIVA_BOLD" "$SHIVA_RESET"
-shiva_status ok "Passed" "$passed"
-shiva_status warn "Warning" "$warnings"
-shiva_status fail "Errors" "$failures"
-printf '\n%sServer Health%s\n\n%d%%\n' "$SHIVA_BOLD" "$SHIVA_RESET" "$health_percent"
+shiva_status ok "Passed" "$SHIVA_HEALTH_PASSED"
+shiva_status warn "Warning" "$SHIVA_HEALTH_WARNINGS"
+shiva_status fail "Errors" "$SHIVA_HEALTH_FAILURES"
+printf '\n%sServer Health%s\n\n%d%%\n' "$SHIVA_BOLD" "$SHIVA_RESET" "$SHIVA_HEALTH_PERCENT"
 printf '\n══════════════════════════════════════\n\n%sOverall Status%s\n\n' "$SHIVA_BOLD" "$SHIVA_RESET"
-case "$overall" in
+case "$SHIVA_HEALTH_OVERALL" in
   attention_required) shiva_status fail "" "ATTENTION REQUIRED" ;;
   good_with_warnings) shiva_status warn "" "GOOD, WITH WARNINGS" ;;
   *) shiva_status ok "" "EXCELLENT" ;;

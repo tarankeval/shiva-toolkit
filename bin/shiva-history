@@ -11,12 +11,13 @@ date_filter=""
 service_filter=""
 summary=false
 json=false
+health_timeline=false
 history_tmp="$(mktemp "${TMPDIR:-/tmp}/shiva-history.XXXXXX")" || exit 1
 trap 'rm -f "$history_tmp"' EXIT
 
 usage() {
   cat <<'EOF'
-Usage: shiva history [--summary] [--json] [--date YYYY-MM-DD] [--module name] [--service name] [--level level] [lines]
+Usage: shiva history [--summary] [--health] [--json] [--date YYYY-MM-DD] [--module name] [--service name] [--level level] [lines]
 
 Show recent Shiva Toolkit operational history.
 EOF
@@ -40,6 +41,9 @@ while (($#)); do
     ;;
   --summary)
     summary=true
+    ;;
+  --health)
+    health_timeline=true
     ;;
   --json)
     json=true
@@ -98,6 +102,48 @@ done
 if [[ ! "$limit" =~ ^[0-9]+$ ]]; then
   printf 'History line count must be a number.\n' >&2
   exit 1
+fi
+
+show_health_timeline() {
+  if [[ ! -r "$SHIVA_HEALTH_TIMELINE_FILE" ]]; then
+    if [[ "$json" == true ]]; then
+      printf '{'
+      shiva_json_metadata "health-timeline" "ok" "null"
+      printf '"checks":[],"points":[]}\n'
+    else
+      shiva_title "SHIVA HEALTH TIMELINE v$SHIVA_VERSION"
+      printf 'No health timeline recorded yet.\n'
+      printf '\nTimeline file: %s\n' "$SHIVA_HEALTH_TIMELINE_FILE"
+    fi
+    exit 0
+  fi
+  tail -n "$limit" "$SHIVA_HEALTH_TIMELINE_FILE" >"$history_tmp"
+  if [[ "$json" == true ]]; then
+    printf '{'
+    shiva_json_metadata "health-timeline" "ok" "null"
+    printf '"checks":[],"points":['
+    awk -F '\t' '
+      function esc(value) {
+        gsub(/\\/,"\\\\",value)
+        gsub(/"/,"\\\"",value)
+        return value
+      }
+      {
+        if (count > 0) printf ","
+        printf "{\"time\":\"%s\",\"health_percent\":%s,\"overall\":\"%s\",\"failures\":%s}", esc($1), $2, esc($3), $4
+        count += 1
+      }
+    ' "$history_tmp"
+    printf ']}\n'
+    exit 0
+  fi
+  shiva_title "SHIVA HEALTH TIMELINE v$SHIVA_VERSION"
+  awk -F '\t' '{printf "%s   %s%%   %s (%s failure(s))\n", $1, $2, $3, $4}' "$history_tmp"
+  exit 0
+}
+
+if [[ "$health_timeline" == true ]]; then
+  show_health_timeline
 fi
 
 if [[ "$json" != true ]]; then

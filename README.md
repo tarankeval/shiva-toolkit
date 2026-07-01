@@ -76,6 +76,8 @@ shiva watchdog --config
 shiva history
 shiva history --summary
 shiva history --json --date 2026-06-25
+shiva history --health
+shiva history --health --json
 shiva history --module watchdog
 shiva history --level ERROR
 shiva history --service openvpn
@@ -85,6 +87,7 @@ shiva advisor --notify
 shiva dashboard
 shiva dashboard --json
 shiva dashboard --compact
+shiva dashboard --rich
 shiva dashboard --watch --interval 5
 shiva notify status
 shiva notify test
@@ -139,6 +142,13 @@ Commands that do not represent health directly use `health_percent: null` and
 keep their domain-specific arrays, for example `nodes`, `entries`, or
 `recommendations`.
 
+`shiva health` stores the canonical health snapshot and timeline in:
+
+```text
+/var/lib/shiva/health.json
+/var/lib/shiva/health.timeline
+```
+
 `shiva dashboard` stores the latest dashboard snapshot in:
 
 ```text
@@ -148,6 +158,18 @@ keep their domain-specific arrays, for example `nodes`, `entries`, or
 Override this path with `SHIVA_DASHBOARD_SNAPSHOT_FILE` for tests or custom
 deployments. `shiva cluster` reads this snapshot first and only falls back to a
 fresh dashboard collection when no snapshot exists.
+
+Health changes are split into state and events. State lives in the health and
+dashboard snapshots. Changes are appended to:
+
+```text
+/var/lib/shiva/events.log
+/var/lib/shiva/notify.queue
+```
+
+This prepares the path for `Health Engine -> Event Engine -> Notification
+Queue -> Telegram` without making Telegram responsible for deciding what
+should be sent.
 
 The watchdog is installed with a systemd unit:
 

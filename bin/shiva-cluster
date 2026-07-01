@@ -76,8 +76,6 @@ if [[ "$json" == true ]]; then
   printf '"nodes":%s,' "$node_total"
   printf '"local_nodes":%s,' "$node_local"
   printf '"configured_nodes":%s,' "$node_configured"
-  printf '"overall":"%s",' "$(json_escape "$overall")"
-  printf '"health_percent":%s,' "$health_percent"
   printf '"failures":%s,' "$failures"
   printf '"warnings":%s,' "$warnings"
   printf '"watchdog":"%s",' "$(json_escape "$watchdog")"
